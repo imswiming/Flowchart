@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flowchart Editor</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="script.js" defer></script>
+</head>
+
+<body>
+  <div class="container">
+    <div class="flowchart-panel" id="flowchart-panel">
+      <div id="flowchart"></div>
+      <div class="zoom-controls">
+        <div class="zoom-btn" id="zoom-in">+</div>
+        <div class="zoom-btn" id="zoom-out">-</div>
+        <div class="zoom-btn" id="reset-zoom">↻</div>
+      </div>
+      <div class="reset-view-controls">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <!-- Move connection controls row -->
+          <div id="connection-controls-row"
+            style="display:none; width:100%; justify-content:flex-start; margin-bottom:4px;">
+            <div id="connection-controls" style="display:flex; gap: 4px;">
+              <button id="move-connection-left" class="reset-view-btn" style="width:auto; margin-top:0;">&larr; Move
+                Left</button>
+              <button id="move-connection-right" class="reset-view-btn" style="width:auto; margin-top:0;">Move Right
+                &rarr;</button>
+              <button id="delete-connection-btn" class="reset-view-btn"
+                style="width:auto; background:#ffe0e0; border-color:#ffaaaa; color:#a00;">Delete
+                Connector</button>
+            </div>
+          </div>
+          <!-- Main controls row -->
+          <div style="display: flex; gap: 8px;">
+            <div class="reset-view-btn" id="undo-btn">Undo</div>
+            <div class="reset-view-btn" id="redo-btn">Redo</div>
+            <div class="reset-view-btn" id="reset-view">Reset View</div>
+            <div class="reset-view-btn" id="export-btn">Export</div>
+            <div class="reset-view-btn" id="import-btn">Import</div>
+            <div class="reset-view-btn" id="open-btn">Open</div>
+          </div>
+          <!-- Node delete button row -->
+          <div id="node-controls-row" style="display:none; width:100%; justify-content:flex-end; margin-top:4px;">
+            <!-- Delete Node button removed -->
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Node text edit popup -->
+    <div id="node-edit-popup"
+      style="display:none; position:absolute; left:50%; bottom:80px; transform:translateX(-50%); background:white; border:1px solid #ccc; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,0.15); padding:16px 24px; z-index:3000; font-size:16px; min-width:260px;">
+      <form id="node-edit-form" style="display:flex; gap:10px; align-items:center;">
+        <input id="node-edit-input" type="text"
+          style="flex:1; font-size:16px; padding:4px 8px; border-radius:4px; border:1px solid #aaa;">
+      </form>
+    </div>
+    <!-- Export popup -->
+    <div id="export-popup"
+      style="display:none; position:absolute; left:50%; top:80px; transform:translateX(-50%); background:white; border:1px solid #ccc; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,0.15); padding:16px 24px; z-index:3000; font-size:16px; min-width:340px;">
+      <div style="margin-bottom:8px; font-weight:bold;">Exported Flowchart</div>
+      <textarea id="export-textarea"
+        style="width:100%; height:180px; font-size:14px; border-radius:4px; border:1px solid #aaa; resize:vertical;"
+        readonly></textarea>
+      <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+        <button id="close-export-btn"
+          style="font-size:15px; padding:6px 18px; border:1px solid #aaa; border-radius:5px; background:#f8f8f8; cursor:pointer;">Close</button>
+      </div>
+    </div>
+    <!-- Import popup -->
+    <div id="import-popup"
+      style="display:none; position:absolute; left:50%; top:80px; transform:translateX(-50%); background:white; border:1px solid #ccc; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,0.15); padding:16px 24px; z-index:3000; font-size:16px; min-width:340px;">
+      <div style="margin-bottom:8px; font-weight:bold;">Import Flowchart (Indented Text)</div>
+      <textarea id="import-textarea"
+        style="width:100%; height:180px; font-size:14px; border-radius:4px; border:1px solid #aaa; resize:vertical;"></textarea>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
+        <button id="import-confirm-btn"
+          style="font-size:15px; padding:6px 18px; border:1px solid #aaa; border-radius:5px; background:#e0ffe0; cursor:pointer;">Import</button>
+        <button id="close-import-btn"
+          style="font-size:15px; padding:6px 18px; border:1px solid #aaa; border-radius:5px; background:#f8f8f8; cursor:pointer;">Cancel</button>
+      </div>
+    </div>
+    <!-- Storage popup -->
+    <div id="storage-popup">
+      <div style="margin-bottom:8px; font-weight:bold;">Saved Flowcharts</div>
+      <div id="storage-slots"></div>
+      <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+        <button id="close-storage-btn"
+          style="font-size:15px; padding:6px 18px; border:1px solid #aaa; border-radius:5px; background:#f8f8f8; cursor:pointer;">Close</button>
+      </div>
+    </div>
+    <!-- Add connection controls for moving selected connection -->
+    <div class="connection-controls" id="connection-controls" style="display:none;">
+      <button id="move-connection-left">&larr; Move Left</button>
+      <button id="move-connection-right">Move Right &rarr;</button>
+    </div>
+  </div>
+</body>
+
+</html>
