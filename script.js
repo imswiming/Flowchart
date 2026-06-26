@@ -369,6 +369,7 @@ class FlowchartViewer {
                     this.rootData = treeData;
                 } else {
                     this.rootData = this.wrapRootWithPlaceholder(treeData);
+                    this.ensureRightmostPlaceholderNodes(this.rootData);
                 }
                 
                 if (parsed.customConnections) {
@@ -540,7 +541,7 @@ class FlowchartViewer {
 
     ensureRightmostPlaceholderNodes(nodeData) {
         if (!nodeData || typeof nodeData !== 'object') return;
-        if (this.isPlaceholderNodeData(nodeData)) return;
+        // (line removed)
 
         if (!Array.isArray(nodeData.children) || nodeData.children.length === 0) {
             return;
@@ -1844,6 +1845,7 @@ class FlowchartViewer {
     renderFlowchart(data) {
         this.syncTransform();
         this.rootData = this.wrapRootWithPlaceholder(data);
+        this.ensureRightmostPlaceholderNodes(this.rootData);
         
         const contentRoot = this.rootData.children && this.rootData.children.length > 0
             ? this.rootData.children[0]
