@@ -480,6 +480,138 @@
         // Initial update
         setTimeout(updateHamburgerStates, 100);
       }
+
+      // ===== KEYBOARD AUTO-LAUNCH ON NODE SELECT =====
+      // Override the showNodeEditPopup method to force keyboard on mobile
+      const originalShowNodeEditPopup = window.FlowchartViewer && 
+        window.FlowchartViewer.prototype && 
+        window.FlowchartViewer.prototype.showNodeEditPopup;
+
+      if (originalShowNodeEditPopup) {
+        // The method is defined in script.js, we'll patch it via a custom wrapper
+        // Since we can't easily override the prototype method directly, we'll use
+        // a MutationObserver to detect when the input gets focus and then force the keyboard
+        const nodeEditInput = document.getElementById('node-edit-input');
+        if (nodeEditInput) {
+          // Force focus and keyboard on any click or touch on the flowchart
+          const flowchart = document.getElementById('flowchart');
+          
+          // Detect node clicks by watching for the node-edit-popup becoming visible
+          const popupObserver = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+              if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                const popup = mutation.target;
+                if (popup.style.display === 'block') {
+                  // Popup is now visible - focus the input and force keyboard
+                  const input = document.getElementById('node-edit-input');
+                  if (input) {
+                    // Small delay to ensure popup is fully rendered
+                    setTimeout(() => {
+                      input.focus();
+                      input.click(); // Some mobile browsers need click to trigger keyboard
+                      // For iOS, we also need to call focus again after a tiny delay
+                      setTimeout(() => {
+                        input.focus();
+                        input.click();
+                      }, 100);
+                    }, 50);
+                  }
+                }
+              }
+            });
+          });
+
+          const popup = document.getElementById('node-edit-popup');
+          if (popup) {
+            popupObserver.observe(popup, { attributes: true, attributeFilter: ['style'] });
+          }
+
+          // Also intercept clicks on the input itself to ensure keyboard
+          nodeEditInput.addEventListener('click', function(e) {
+            this.focus();
+            this.click(); // Force keyboard
+          });
+
+          nodeEditInput.addEventListener('touchstart', function(e) {
+            this.focus();
+            // On some devices, touchstart doesn't trigger keyboard reliably
+            setTimeout(() => {
+              this.focus();
+              this.click();
+            }, 50);
+          });
+        }
+
+        // Also patch the showNodeEditPopup in the instance after it's created
+        // We'll use a global variable to store the instance
+        const origInit = window.FlowchartViewer;
+        if (origInit) {
+          // Wait for the instance to be created
+          const checkInstance = setInterval(() => {
+            // Find the FlowchartViewer instance
+            const viewer = document.querySelector('.flowchart-panel')?.__viewer;
+            if (viewer && viewer.showNodeEditPopup) {
+              clearInterval(checkInstance);
+              // Store reference to original method
+              const original = viewer.showNodeEditPopup.bind(viewer);
+              viewer.showNodeEditPopup = function(d) {
+                original(d);
+                // Focus input after popup is shown
+                setTimeout(() => {
+                  const input = document.getElementById('node-edit-input');
+                  if (input) {
+                    input.focus();
+                    input.click();
+                    setTimeout(() => {
+                      input.focus();
+                      input.click();
+                    }, 100);
+                  }
+                }, 50);
+              };
+            }
+          }, 100);
+        }
+      }
+
+      // Alternative approach: monitor clicks on the flowchart for node selection
+      document.addEventListener('click', function(e) {
+        const nodeElement = e.target.closest('.node');
+        if (nodeElement) {
+          // A node was clicked - wait for popup to appear and then focus input
+          setTimeout(() => {
+            const input = document.getElementById('node-edit-input');
+            const popup = document.getElementById('node-edit-popup');
+            if (input && popup && popup.style.display === 'block') {
+              input.focus();
+              input.click();
+              setTimeout(() => {
+                input.focus();
+                input.click();
+              }, 100);
+            }
+          }, 200);
+        }
+      });
+
+      // Handle touch events on nodes
+      document.addEventListener('touchstart', function(e) {
+        const nodeElement = e.target.closest('.node');
+        if (nodeElement) {
+          setTimeout(() => {
+            const input = document.getElementById('node-edit-input');
+            const popup = document.getElementById('node-edit-popup');
+            if (input && popup && popup.style.display === 'block') {
+              input.focus();
+              input.click();
+              setTimeout(() => {
+                input.focus();
+                input.click();
+              }, 150);
+            }
+          }, 300);
+        }
+      });
     });
   </script>
 </body>
