@@ -212,6 +212,21 @@ body {
     border: 1px solid #aaa;
 }
 
+/* Export/Import popup button containers */
+#export-popup div:last-child,
+#import-popup div:last-child {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+#export-popup button,
+#import-popup button {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
 .link-handle {
     fill: #999;
     cursor: ew-resize;
@@ -276,7 +291,7 @@ body {
     z-index: 3000;
     font-size: 16px;
     min-width: 340px;
-    max-height: 60vh;
+    max-height: 70vh;
     overflow: hidden;
 }
 
@@ -292,6 +307,8 @@ body {
     display: flex;
     gap: 8px;
     align-items: center;
+    padding: 6px 8px;
+    border-radius: 4px;
 }
 
 .storage-slot input {
@@ -320,6 +337,22 @@ body {
     background-color: var(--control-hover) !important;
     border-left: 4px solid var(--accent) !important;
     padding-left: 8px;
+}
+
+/* Notification styles */
+.flowchart-notification {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    background: rgba(0,0,0,0.85);
+    color: #fff;
+    padding: 10px 14px;
+    border-radius: 6px;
+    z-index: 9999;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+    opacity: 1;
+    transition: opacity 300ms ease;
+    max-width: 400px;
 }
 
 /* Responsive styles for mobile */
@@ -417,12 +450,103 @@ body {
 
     #node-edit-popup {
         min-width: 90vw !important;
+        max-width: 95vw !important;
+        width: 95vw !important;
         left: 50% !important;
         transform: translateX(-50%) !important;
-        padding: 10px 4vw !important;
+        padding: 10px 8px !important;
     }
 
     #node-edit-input {
         font-size: 15px !important;
+    }
+
+    #storage-popup {
+        min-width: 95vw !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        padding: 12px 4vw !important;
+        max-height: 80vh !important;
+    }
+
+    #storage-slots {
+        max-height: 50vh !important;
+    }
+
+    .storage-slot {
+        flex-wrap: wrap !important;
+        gap: 4px !important;
+    }
+
+    .storage-slot button {
+        font-size: 12px !important;
+        padding: 4px 8px !important;
+    }
+
+    /* Fix button wrapping in node edit popup */
+    #node-action-btns {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+        justify-content: center !important;
+    }
+    
+    #node-action-btns button {
+        flex: 0 1 auto !important;
+        min-width: 0 !important;
+        font-size: 13px !important;
+        padding: 6px 12px !important;
+        white-space: nowrap !important;
+    }
+    
+    #node-sibling-btns {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+        justify-content: center !important;
+    }
+    
+    #node-sibling-btns button {
+        flex: 0 1 auto !important;
+        min-width: 0 !important;
+        font-size: 13px !important;
+        padding: 6px 12px !important;
+        white-space: nowrap !important;
+    }
+    
+    #node-move-btns {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+        justify-content: center !important;
+    }
+    
+    #node-move-btns button {
+        flex: 0 1 auto !important;
+        min-width: 0 !important;
+        font-size: 13px !important;
+        padding: 6px 12px !important;
+        white-space: nowrap !important;
+    }
+    
+    #node-color-btns {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+        justify-content: center !important;
+    }
+    
+    #node-color-btns button {
+        flex: 0 1 auto !important;
+        min-width: 0 !important;
+        font-size: 12px !important;
+        padding: 4px 10px !important;
+        white-space: nowrap !important;
+    }
+
+    #export-popup div:last-child button,
+    #import-popup div:last-child button {
+        font-size: 14px !important;
+        padding: 6px 12px !important;
     }
 }
