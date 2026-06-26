@@ -21,6 +21,7 @@ class FlowchartViewer {
         this.storagePopup = document.getElementById('storage-popup');
         this.storageSlots = document.getElementById('storage-slots');
         this.closeStorageBtn = document.getElementById('close-storage-btn');
+        this.newFlowchartBtn = document.getElementById('new-flowchart-btn');
 
         this.selectedConnection = null;
         this.connectionMoveStep = 10;
@@ -68,6 +69,11 @@ class FlowchartViewer {
         this.nodeEditForm = document.getElementById('node-edit-form');
         this.nodeBeingEdited = null;
 
+        // Current active flowchart index
+        this.currentSlotIndex = null;
+        this.flowchartList = [];
+        this.loadFlowchartList();
+
         // Set up event listeners
         this.zoomInBtn.addEventListener('click', () => this.zoom(1 + this.zoomStep));
         this.zoomOutBtn.addEventListener('click', () => this.zoom(1 - this.zoomStep));
@@ -82,7 +88,7 @@ class FlowchartViewer {
         this.importConfirmBtn.addEventListener('click', () => this.importFromText());
         this.openBtn.addEventListener('click', () => this.showStoragePopup());
         this.closeStorageBtn.addEventListener('click', () => this.storagePopup.style.display = 'none');
-
+        this.newFlowchartBtn.addEventListener('click', () => this.createNewFlowchart());
 
         // Node edit popup handlers
         this.nodeEditForm.addEventListener('submit', (e) => {
@@ -92,9 +98,8 @@ class FlowchartViewer {
 
         // Initial flowchart render with sample data
         this.renderFlowchart(this.getSampleData());
-
-        // Flag to track initial view setup
-        this._hasInitialView = false;
+        this.currentSlotIndex = 0;
+        this.saveCurrentFlowchart();
 
         // Keyboard shortcuts for undo/redo and delete
         document.addEventListener('keydown', (e) => {
@@ -125,7 +130,49 @@ class FlowchartViewer {
         this.moveLeftBtn.addEventListener('click', () => this.moveSelectedConnection(-this.connectionMoveStep));
         this.moveRightBtn.addEventListener('click', () => this.moveSelectedConnection(this.connectionMoveStep));
         this.deleteConnectionBtn.addEventListener('click', () => this.deleteSelectedConnection());
-        // Remove deleteNodeBtn event listener
+    }
+
+    // Load flowchart list from localStorage
+    loadFlowchartList() {
+        const saved = localStorage.getItem('flowchart-list');
+        if (saved) {
+            try {
+                this.flowchartList = JSON.parse(saved);
+                // Ensure each entry has a title and data
+                this.flowchartList = this.flowchartList.filter(item => item && item.data);
+            } catch (e) {
+                this.flowchartList = [];
+            }
+        } else {
+            this.flowchartList = [];
+        }
+    }
+
+    // Save flowchart list to localStorage
+    saveFlowchartList() {
+        localStorage.setItem('flowchart-list', JSON.stringify(this.flowchartList));
+    }
+
+    // Save current flowchart to the list
+    saveCurrentFlowchart() {
+        if (this.currentSlotIndex === null) return;
+        const data = this.exportAsJSON();
+        if (this.currentSlotIndex < this.flowchartList.length) {
+            this.flowchartList[this.currentSlotIndex].data = data;
+        } else {
+            // If index is out of bounds, add a new entry
+            this.flowchartList.push({
+                title: `Flowchart ${this.flowchartList.length + 1}`,
+                data: data
+            });
+            this.currentSlotIndex = this.flowchartList.length - 1;
+        }
+        this.saveFlowchartList();
+    }
+
+    // Autosave wrapper - call after any edit
+    autosave() {
+        this.saveCurrentFlowchart();
     }
 
     // Helper methods for leaf node and green node detection
@@ -166,163 +213,189 @@ class FlowchartViewer {
     }
 
     showStoragePopup() {
+        this.loadFlowchartList();
         this.storageSlots.innerHTML = '';
         
-        // Create 10 storage slots
-        for (let i = 0; i < 10; i++) {
-            const slot = document.createElement('div');
-            slot.style.display = 'flex';
-            slot.style.gap = '8px';
-            slot.style.alignItems = 'center';
-            
-            const titleInput = document.createElement('input');
-            titleInput.type = 'text';
-            titleInput.placeholder = `Flowchart ${i+1}`;
-            titleInput.style.flex = '1';
-            titleInput.style.padding = '4px 8px';
-            titleInput.style.border = '1px solid #aaa';
-            titleInput.style.borderRadius = '4px';
-            
-            const selectBtn = document.createElement('button');
-            selectBtn.textContent = 'Select';
-            selectBtn.style.padding = '4px 12px';
-            selectBtn.style.background = '#e0f0ff';
-            selectBtn.style.border = '1px solid #aaa';
-            selectBtn.style.borderRadius = '4px';
-            selectBtn.style.cursor = 'pointer';
-            
-            const saveBtn = document.createElement('button');
-            saveBtn.textContent = 'Save';
-            saveBtn.style.padding = '4px 12px';
-            saveBtn.style.background = '#e0ffe0';
-            saveBtn.style.border = '1px solid #aaa';
-            saveBtn.style.borderRadius = '4px';
-            saveBtn.style.cursor = 'pointer';
-            
-            // Load saved data if exists
-            const savedData = localStorage.getItem(`flowchart-slot-${i}`);
-            if (savedData) {
-                try {
-                    const parsed = JSON.parse(savedData);
-                    if (parsed.title) titleInput.value = parsed.title;
-                } catch (e) {
-                    console.error('Error parsing saved data:', e);
+        // Display existing flowcharts
+        if (this.flowchartList.length === 0) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.textContent = 'No flowcharts saved. Click "New Flowchart" to create one.';
+            emptyMsg.style.padding = '20px';
+            emptyMsg.style.textAlign = 'center';
+            emptyMsg.style.color = '#9aa6b2';
+            this.storageSlots.appendChild(emptyMsg);
+        } else {
+            this.flowchartList.forEach((item, index) => {
+                const slot = document.createElement('div');
+                slot.className = 'storage-slot';
+                if (index === this.currentSlotIndex) {
+                    slot.classList.add('active-slot');
                 }
-            }
-            // Confirm before selecting (loading) a saved slot
-            selectBtn.onclick = (ev) => {
-                ev.stopPropagation();
-                const title = titleInput.value || `Flowchart ${i+1}`;
-                if (!localStorage.getItem(`flowchart-slot-${i}`)) {
-                    alert('No saved flowchart in this slot.');
-                    return;
-                }
-                if (confirm(`Load "${title}" from slot ${i+1}? Unsaved changes will be lost.`)) {
-                    this.loadFromStorage(i);
+                
+                const titleSpan = document.createElement('span');
+                titleSpan.textContent = item.title || `Flowchart ${index + 1}`;
+                titleSpan.style.flex = '1';
+                titleSpan.style.padding = '4px 8px';
+                
+                const selectBtn = document.createElement('button');
+                selectBtn.textContent = 'Select';
+                selectBtn.style.padding = '4px 12px';
+                selectBtn.style.background = '#e0f0ff';
+                selectBtn.style.border = '1px solid #aaa';
+                selectBtn.style.borderRadius = '4px';
+                selectBtn.style.cursor = 'pointer';
+                
+                selectBtn.onclick = () => {
+                    this.loadFlowchartFromList(index);
                     this.storagePopup.style.display = 'none';
-                }
-            };
-            
-            saveBtn.onclick = (ev) => {
-                ev.stopPropagation();
-                const title = titleInput.value || `Flowchart ${i+1}`;
-                const hasExisting = !!localStorage.getItem(`flowchart-slot-${i}`);
-                const msg = hasExisting ?
-                    `Overwrite existing "${title}" in slot ${i+1}?` :
-                    `Save "${title}" to slot ${i+1}?`;
-                if (confirm(msg)) {
-                    this.saveToStorage(i, titleInput.value);
-                }
-            };
-            
-            slot.appendChild(titleInput);
-            slot.appendChild(selectBtn);
-            slot.appendChild(saveBtn);
-            this.storageSlots.appendChild(slot);
+                };
+                
+                const renameBtn = document.createElement('button');
+                renameBtn.textContent = 'Rename';
+                renameBtn.style.padding = '4px 12px';
+                renameBtn.style.background = '#fff0d0';
+                renameBtn.style.border = '1px solid #aaa';
+                renameBtn.style.borderRadius = '4px';
+                renameBtn.style.cursor = 'pointer';
+                
+                renameBtn.onclick = () => {
+                    const newTitle = prompt('Enter new name:', titleSpan.textContent);
+                    if (newTitle && newTitle.trim()) {
+                        this.flowchartList[index].title = newTitle.trim();
+                        this.saveFlowchartList();
+                        this.showStoragePopup();
+                    }
+                };
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.style.padding = '4px 12px';
+                deleteBtn.style.background = '#ffe0e0';
+                deleteBtn.style.border = '1px solid #ffaaaa';
+                deleteBtn.style.borderRadius = '4px';
+                deleteBtn.style.cursor = 'pointer';
+                
+                deleteBtn.onclick = () => {
+                    if (confirm(`Delete "${titleSpan.textContent}"?`)) {
+                        this.flowchartList.splice(index, 1);
+                        if (this.currentSlotIndex === index) {
+                            this.currentSlotIndex = null;
+                        } else if (this.currentSlotIndex > index) {
+                            this.currentSlotIndex--;
+                        }
+                        this.saveFlowchartList();
+                        this.showStoragePopup();
+                        if (this.flowchartList.length === 0) {
+                            this.renderFlowchart(this.getSampleData());
+                            this.currentSlotIndex = 0;
+                            this.saveCurrentFlowchart();
+                        } else if (this.currentSlotIndex === null) {
+                            this.loadFlowchartFromList(0);
+                        }
+                    }
+                };
+                
+                slot.appendChild(titleSpan);
+                slot.appendChild(selectBtn);
+                slot.appendChild(renameBtn);
+                slot.appendChild(deleteBtn);
+                this.storageSlots.appendChild(slot);
+            });
         }
         
         this.storagePopup.style.display = 'block';
     }
     
-    saveToStorage(slotIndex, title) {
-        const data = {
-            title: title || `Flowchart ${slotIndex+1}`,
-            data: this.exportAsJSON(),
-            timestamp: new Date().toISOString()
+    createNewFlowchart() {
+        if (this.currentSlotIndex !== null && this.flowchartList[this.currentSlotIndex]) {
+            this.saveCurrentFlowchart();
+        }
+        
+        const defaultData = {
+            name: "New Flowchart",
+            children: [
+                { name: "Start" }
+            ]
         };
         
-        localStorage.setItem(`flowchart-slot-${slotIndex}`, JSON.stringify(data));
-        this.showStoragePopup(); // Refresh the list
-        // Notify the user that the save completed
-        try {
-            this.showNotification(`Saved "${data.title}" to slot ${slotIndex+1}`);
-        } catch (e) {
-            // Fallback to alert if notifications fail
-            console.log('Notification failed:', e);
-        }
-    }
-
-    showNotification(message, duration = 3000) {
-        const notif = document.createElement('div');
-        notif.className = 'flowchart-notification';
-        notif.textContent = message;
-        Object.assign(notif.style, {
-            position: 'fixed',
-            right: '20px',
-            bottom: '20px',
-            background: 'rgba(0,0,0,0.85)',
-            color: '#fff',
-            padding: '10px 14px',
-            borderRadius: '6px',
-            zIndex: 9999,
-            boxShadow: '0 6px 18px rgba(0,0,0,0.3)',
-            opacity: '1',
-            transition: 'opacity 300ms ease'
+        this.flowchartList.push({
+            title: `Flowchart ${this.flowchartList.length + 1}`,
+            data: JSON.stringify({
+                tree: defaultData,
+                customConnections: []
+            })
         });
-        document.body.appendChild(notif);
-        setTimeout(() => {
-            notif.style.opacity = '0';
-            setTimeout(() => {
-                try { notif.remove(); } catch (e) {}
-            }, 300);
-        }, duration);
+        
+        this.currentSlotIndex = this.flowchartList.length - 1;
+        this.saveFlowchartList();
+        
+        if (this.currentSlotIndex !== null && this.flowchartList[this.currentSlotIndex]) {
+            this.saveCurrentFlowchart();
+        }
+        
+        this.customConnections = [];
+        this.rootData = defaultData;
+        this.transform = d3.zoomIdentity;
+        this._zoomBehavior = null;
+        
+        this.renderFlowchart(this.rootData);
+        this.currentSlotIndex = this.flowchartList.length - 1;
+        this.saveCurrentFlowchart();
+        
+        this.storagePopup.style.display = 'none';
+        this.showNotification('New flowchart created!');
     }
     
-    loadFromStorage(slotIndex) {
-        const savedData = localStorage.getItem(`flowchart-slot-${slotIndex}`);
-        if (!savedData) return;
+    loadFlowchartFromList(index) {
+        if (index >= this.flowchartList.length) return;
+        
+        if (this.currentSlotIndex !== null && this.flowchartList[this.currentSlotIndex]) {
+            this.saveCurrentFlowchart();
+        }
+        
+        const item = this.flowchartList[index];
+        if (!item || !item.data) return;
         
         try {
-            const parsed = JSON.parse(savedData);
-            if (parsed.data) {
-                const flowData = JSON.parse(parsed.data);
-                if (flowData.tree) {
-                    this.pushUndo();
-                    this.renderFlowchart(flowData.tree);
-                    
-                    // Restore connections if they exist
-                    if (flowData.customConnections) {
-                        const nodeMap = new Map();
-                        d3.hierarchy(this.rootData).each(d => nodeMap.set(d.data.name, d.data));
-                        
-                        this.customConnections = flowData.customConnections
-                            .map(conn => {
-                                const source = nodeMap.get(conn.source);
-                                const target = nodeMap.get(conn.target);
-                                if (source && target) {
-                                    return {
-                                        source,
-                                        target,
-                                        _offset: conn._offset || 0
-                                    };
-                                }
-                                return null;
-                            })
-                            .filter(Boolean);
-                        
-                        this.renderFlowchart(this.rootData);
-                    }
+            const parsed = JSON.parse(item.data);
+            if (parsed.tree) {
+                this.pushUndo();
+                this.transform = d3.zoomIdentity;
+                this._zoomBehavior = null;
+                
+                let treeData = parsed.tree;
+                if (this.isPlaceholderNodeData(treeData) || 
+                    (treeData.name === '' && treeData.color === this.getPlaceholderColor() && treeData.children && treeData.children.length > 0)) {
+                    this.rootData = treeData;
+                } else {
+                    this.rootData = this.wrapRootWithPlaceholder(treeData);
                 }
+                
+                if (parsed.customConnections) {
+                    const nodeMap = new Map();
+                    d3.hierarchy(this.rootData).each(d => nodeMap.set(d.data.name, d.data));
+                    
+                    this.customConnections = parsed.customConnections
+                        .map(conn => {
+                            const source = nodeMap.get(conn.source);
+                            const target = nodeMap.get(conn.target);
+                            if (source && target) {
+                                return {
+                                    source,
+                                    target,
+                                    _offset: conn._offset || 0
+                                };
+                            }
+                            return null;
+                        })
+                        .filter(Boolean);
+                    
+                    this.renderFlowchart(this.rootData);
+                }
+                
+                this.renderFlowchart(this.rootData);
+                this.currentSlotIndex = index;
+                this.saveCurrentFlowchart();
             }
         } catch (e) {
             console.error('Error loading saved flowchart:', e);
@@ -331,7 +404,6 @@ class FlowchartViewer {
     }
 
     getSampleData() {
-        // Sample hierarchical data
         return {
             name: "Root",
             children: [
@@ -354,124 +426,57 @@ class FlowchartViewer {
     }
 
     setupZoom(svg, g) {
-        const zoom = d3.zoom()
-            .scaleExtent([this.minZoom, this.maxZoom])
-            .on('zoom', (event) => {
-                this.transform = event.transform;
-                g.attr('transform', this.transform);
-                // Hide context menu and node edit popup when zooming
-                this.hideContextMenu();
-                this.hideNodeEditPopup(true);
-            });
-
-        svg.call(zoom);
-
-        // Prevent double-application of zoom transform
-        if (this.transform) {
-            svg.call(zoom.transform, this.transform);
+        if (!this._zoomBehavior) {
+            this._zoomBehavior = d3.zoom()
+                .scaleExtent([this.minZoom, this.maxZoom])
+                .on('zoom', (event) => {
+                    this.transform = event.transform;
+                    d3.select('#flowchart g').attr('transform', this.transform);
+                    this.hideContextMenu();
+                    this.hideNodeEditPopup(true);
+                });
         }
 
-        // Remove default double-click behavior
+        svg.call(this._zoomBehavior);
+        svg.call(this._zoomBehavior.transform, this.transform);
+
         svg.on('dblclick.zoom', null);
         svg.on('dblclick', () => this.resetZoom());
 
-        // Add panning with mouse drag
-        let isDragging = false;
-        let startX, startY;
-
-        svg.on('mousedown', (event) => {
-            // Only start drag if not clicking on a node or context menu
-            if (event.button === 0 && !event.target.closest('.node') && !event.target.closest('.context-menu')) {
-                isDragging = true;
-                startX = event.clientX;
-                startY = event.clientY;
-                svg.style('cursor', 'grabbing');
-                // Hide context menu if open when starting drag
-                this.hideContextMenu();
-                // Hide node edit popup if open when starting drag
-                this.hideNodeEditPopup(true);
-            }
-        });
-
         svg.on('click', (event) => {
-            // Hide context menu and node edit popup if clicking on background (not node or menu)
             if (event.target === svg.node()) {
                 this.hideContextMenu();
-                this.hideNodeEditPopup(true); // Save on background click
-                // Only cancel move if in move mode
-                if (this.isMovingNode) {
-                    this.cancelMoveNode();
-                }
-                if (this.isMakingConnection) {
-                    this.cancelMakeConnection();
-                }
+                this.hideNodeEditPopup(true);
+                if (this.isMovingNode) this.cancelMoveNode();
+                if (this.isMakingConnection) this.cancelMakeConnection();
             }
-        });
-
-        svg.on('mousemove', (event) => {
-            if (isDragging) {
-                const dx = event.clientX - startX;
-                const dy = event.clientY - startY;
-
-                this.transform.x += dx;
-                this.transform.y += dy;
-
-                g.attr('transform', this.transform);
-
-                startX = event.clientX;
-                startY = event.clientY;
-            }
-        });
-
-        svg.on('mouseup', () => {
-            isDragging = false;
-            svg.style('cursor', '');
-        });
-
-        svg.on('mouseleave', () => {
-            isDragging = false;
-            svg.style('cursor', '');
         });
     }
 
     zoom(factor) {
-        const currentScale = this.transform.k;
-        const newScale = currentScale * factor;
-
-        if (newScale < this.minZoom || newScale > this.maxZoom) {
-            return;
-        }
-
-        // Get center of viewport
+        const svg = d3.select('#flowchart svg');
+        if (!this._zoomBehavior || svg.empty()) return;
         const container = this.flowchartContainer.getBoundingClientRect();
-        const centerX = container.width / 2;
-        const centerY = container.height / 2;
-
-        // Calculate new transform
-        this.transform = d3.zoomIdentity
-            .translate(this.transform.x, this.transform.y)
-            .scale(newScale)
-            .translate(-centerX, -centerY)
-            .translate(centerX, centerY);
-
-        // Apply the transform
-        d3.select('#flowchart g')
-            .attr('transform', this.transform);
+        const cx = container.width / 2;
+        const cy = container.height / 2;
+        svg.call(this._zoomBehavior.scaleBy, factor, [cx, cy]);
     }
 
     resetZoom() {
-        const container = this.flowchartContainer.getBoundingClientRect();
-        const centerX = container.width / 2;
-        const centerY = container.height / 2;
+        const svg = d3.select('#flowchart svg');
+        if (!this._zoomBehavior || svg.empty()) return;
+        svg.transition().duration(300)
+            .call(this._zoomBehavior.scaleTo, 1);
+    }
 
-        this.transform = d3.zoomIdentity
-            .translate(this.transform.x, this.transform.y)
-            .scale(1);
+    resetView() {
+        this.transform = d3.zoomIdentity;
+        this._zoomBehavior = null;
+        this.updateFlowchart();
+    }
 
-        d3.select('#flowchart g')
-            .transition()
-            .duration(300)
-            .attr('transform', this.transform);
+    updateFlowchart() {
+        this.renderFlowchart(this.rootData);
     }
 
     getNodeLevel(node) {
@@ -509,6 +514,16 @@ class FlowchartViewer {
     wrapRootWithPlaceholder(data) {
         if (!data || typeof data !== 'object') return this.createPlaceholderNode();
         if (this.isPlaceholderNodeData(data)) return data;
+        
+        if (data.children && data.children.length > 0) {
+            if (data.name === '' && data.color === this.getPlaceholderColor()) {
+                const hasRealChild = data.children.some(child => !this.isPlaceholderNodeData(child));
+                if (hasRealChild) {
+                    return data;
+                }
+            }
+        }
+        
         return {
             ...this.createPlaceholderNode(),
             children: [data]
@@ -537,7 +552,6 @@ class FlowchartViewer {
 
         const lastChild = nodeData.children[nodeData.children.length - 1];
 
-        // If the last child is already blank OR a placeholder, don't add another
         if (
             lastChild &&
             (
@@ -549,19 +563,6 @@ class FlowchartViewer {
         }
 
         nodeData.children.push(this.createPlaceholderNode());
-    }
-
-    resetView() {
-        this.transform = d3.zoomIdentity;
-        this.currentZoom = null;
-        this._hasInitialView = false;
-        d3.select('#flowchart g')
-            .transition()
-            .duration(300)
-            .attr('transform', this.transform);
-
-        // Also update the flowchart in case the window was resized
-        this.updateFlowchart();
     }
 
     showContextMenu(event, d) {
@@ -587,7 +588,6 @@ class FlowchartViewer {
             startY: event.clientY
         };
 
-        // Match the look used by the move button: fade the dragged subtree.
         d3.selectAll('.node')
             .filter(nd => d.descendants().includes(nd))
             .selectAll('rect')
@@ -607,13 +607,11 @@ class FlowchartViewer {
             const hoveredDatum = hoveredNode ? d3.select(hoveredNode).datum() : null;
             const sourceD = this.ctrlDragState.source;
 
-            // Clear previous hover highlight.
             d3.selectAll('.node')
                 .selectAll('rect')
                 .attr('stroke', d => d === sourceD ? '#ff9900' : '#999')
                 .attr('stroke-width', d => d === sourceD ? '3px' : '1.5px');
 
-            // Highlight hovered valid target.
             if (hoveredDatum && hoveredDatum !== sourceD && !sourceD.descendants().includes(hoveredDatum)) {
                 d3.select(hoveredNode)
                     .selectAll('rect')
@@ -651,22 +649,17 @@ class FlowchartViewer {
         this.ctrlDragState = null;
     }
 
-    // Start move mode: highlight node and subtree, set flags
     startMoveNode(d) {
         this.isMovingNode = true;
         this.movingNodeDatum = d;
         this.movingNodeAncestors = new Set(d.ancestors().map(a => a.data));
-        // Make node and descendants semi-transparent
         d3.selectAll('.node')
             .filter(nd => d.descendants().includes(nd))
             .selectAll('rect')
             .attr('opacity', 0.4);
-        // Show instruction
         this.showMoveInstruction();
-        // Listen for click on another node
         d3.selectAll('.node')
             .on('click.move', (event, targetD) => {
-                // Prevent moving under itself or descendants
                 if (d === targetD || d.descendants().includes(targetD)) {
                     this.cancelMoveNode();
                     return;
@@ -674,7 +667,6 @@ class FlowchartViewer {
                 this.moveNodeTo(d, targetD);
                 this.cancelMoveNode();
             });
-        // Cancel move if click on background
         d3.select('svg').on('click.cancelmove', (event) => {
             if (event.target.tagName === 'svg') {
                 this.cancelMoveNode();
@@ -683,7 +675,6 @@ class FlowchartViewer {
     }
 
     showMoveInstruction() {
-        // Show a simple overlay at the bottom with a cancel button
         if (!document.getElementById('move-instruction')) {
             const instr = document.createElement('div');
             instr.id = 'move-instruction';
@@ -731,39 +722,31 @@ class FlowchartViewer {
         this.isMovingNode = false;
         this.movingNodeDatum = null;
         this.movingNodeAncestors = null;
-        // Restore opacity
         d3.selectAll('.node rect').attr('opacity', 1);
-        // Remove move listeners
         d3.selectAll('.node').on('click.move', null);
         d3.select('svg').on('click.cancelmove', null);
         this.hideMoveInstruction();
     }
 
-    // Start connection mode: highlight source node, set flags
     startMakeConnection(d) {
         this.isMakingConnection = true;
         this.connectionSourceNode = d;
-        // Highlight source node
         d3.selectAll('.node')
             .filter(nd => nd === d)
             .selectAll('rect')
             .attr('stroke', '#ff9900')
             .attr('stroke-width', '2px');
-        // Show instruction
         this.showConnectionInstruction();
-        // Listen for click on target node
         d3.selectAll('.node')
             .on('click.connect', (event, targetD) => {
-                // Prevent connecting to itself
                 if (d === targetD) {
                     this.cancelMakeConnection();
                     return;
                 }
                 this.createConnection(d, targetD);
-                this.hideNodeEditPopup(false); // <-- Hide text editor after connection
+                this.hideNodeEditPopup(false);
                 this.cancelMakeConnection();
             });
-        // Cancel connection if click on background
         d3.select('svg').on('click.cancelconnect', (event) => {
             if (event.target.tagName === 'svg') {
                 this.cancelMakeConnection();
@@ -772,7 +755,6 @@ class FlowchartViewer {
     }
 
     showConnectionInstruction() {
-        // Show a simple overlay at the bottom with a cancel button
         if (!document.getElementById('connection-instruction')) {
             const instr = document.createElement('div');
             instr.id = 'connection-instruction';
@@ -818,7 +800,6 @@ class FlowchartViewer {
 
     cancelMakeConnection() {
         this.isMakingConnection = false;
-        // Reset source node highlight
         if (this.connectionSourceNode) {
             d3.selectAll('.node')
                 .filter(nd => nd === this.connectionSourceNode)
@@ -827,7 +808,6 @@ class FlowchartViewer {
                 .attr('stroke-width', '1.5px');
         }
         this.connectionSourceNode = null;
-        // Remove connection listeners
         d3.selectAll('.node').on('click.connect', null);
         d3.select('svg').on('click.cancelconnect', null);
         this.hideConnectionInstruction();
@@ -836,11 +816,9 @@ class FlowchartViewer {
     createConnection(sourceD, targetD) {
         this.pushUndo();
 
-        // Determine which node is higher in hierarchy
         const sourceLevel = this.getNodeLevel(sourceD);
         const targetLevel = this.getNodeLevel(targetD);
 
-        // Store connection with proper source/target order
         if (sourceLevel <= targetLevel) {
             this.customConnections.push({
                 source: sourceD.data,
@@ -853,25 +831,21 @@ class FlowchartViewer {
             });
         }
 
-        // Re-render
         this.renderFlowchart(this.rootData);
+        this.autosave();
     }
 
-    // Deep clone utility for data snapshots
     cloneData(data) {
         return JSON.parse(JSON.stringify(data));
     }
 
-    // Push current state to undo stack
     pushUndo() {
         const state = {
             data: this.cloneData(this.rootData),
             connections: JSON.parse(JSON.stringify(this.customConnections))
         };
         this.undoStack.push(state);
-        // Limit stack size if desired
         if (this.undoStack.length > 100) this.undoStack.shift();
-        // Clear redo stack on new action
         this.redoStack = [];
         this.updateUndoRedoButtons();
     }
@@ -895,6 +869,7 @@ class FlowchartViewer {
         this.customConnections = prev.connections;
         this.renderFlowchart(this.rootData);
         this.updateUndoRedoButtons();
+        this.autosave();
     }
 
     redo() {
@@ -909,6 +884,7 @@ class FlowchartViewer {
         this.customConnections = next.connections;
         this.renderFlowchart(this.rootData);
         this.updateUndoRedoButtons();
+        this.autosave();
     }
 
     moveNodeTo(movingD, newParentD) {
@@ -918,40 +894,31 @@ class FlowchartViewer {
 
         this.pushUndo();
         
-        // Get the moving data and its parent
         const movingData = movingD.data;
         const parent = movingD.parent;
         
-        // First, remove the moving node from its parent
         if (parent) {
-            // Remove the node from parent's children
             parent.data.children = (parent.data.children || []).filter(child => child !== movingData);
             if (parent.data.children.length === 0) {
                 delete parent.data.children;
             } else {
-                // Clean up any placeholder nodes in the parent
                 const children = parent.data.children;
-                // Remove any placeholder nodes that are not at the end
                 for (let i = children.length - 2; i >= 0; i--) {
                     if (this.isPlaceholderNodeData(children[i])) {
                         children.splice(i, 1);
                     }
                 }
-                // Ensure the last child is a placeholder if there are children
                 const lastChild = children[children.length - 1];
                 if (!this.isPlaceholderNodeData(lastChild) && lastChild.name && lastChild.name.trim()) {
-                    // Add a placeholder at the end
                     children.push(this.createPlaceholderNode());
                 }
             }
         }
         
-        // Now add the moving node to the new parent
         if (!newParentD.data.children) {
             newParentD.data.children = [];
         }
         
-        // Remove any placeholder at the end of the new parent's children
         const newChildren = newParentD.data.children;
         if (newChildren.length > 0) {
             const lastChild = newChildren[newChildren.length - 1];
@@ -960,30 +927,21 @@ class FlowchartViewer {
             }
         }
         
-        // Add the moving node
         newParentD.data.children.push(movingData);
-        
-        // Add a placeholder at the end
         newParentD.data.children.push(this.createPlaceholderNode());
         
-        // Ensure all placeholders are correct throughout the tree
         this.ensureRightmostPlaceholderNodes(this.rootData);
-        
-        // Update all simplify suffixes after moving
         this.updateSimplifyPrefixes(d3.hierarchy(this.rootData));
         
-        // Re-render
         this.renderFlowchart(this.rootData);
         this.updateUndoRedoButtons();
         this.hideNodeEditPopup(false);
+        this.autosave();
     }
 
     addChildNode(d) {
-        // Save for undo
         this.pushUndo();
-        // Ensure children array exists
         if (!d.data.children) d.data.children = [];
-        // Generate a unique name for the new child
         let baseName = "New Node";
         let idx = 1;
         let siblingNames = (d.data.children || []).map(child => child.name);
@@ -995,55 +953,45 @@ class FlowchartViewer {
         d.data.children.push(newChild);
         this.renderFlowchart(this.rootData);
         this.updateUndoRedoButtons();
-        return newChild; // Return the new child object for further processing
+        this.autosave();
+        return newChild;
     }
 
-    // Add a new parent above the given node. New parent replaces the node in its previous
-    // position and the original node becomes a child of the new parent. New parent starts
-    // with an empty name and is opened for immediate editing.
     addParentNode(d) {
         this.pushUndo();
         const oldData = d.data;
         const parent = d.parent;
         const newParent = { name: '' };
-        // Make the old node a child of the new parent
         newParent.children = [oldData];
 
         if (parent) {
-            // Replace the old node in parent's children with the new parent
             const siblings = parent.data.children || [];
             const idx = siblings.indexOf(oldData);
             if (idx !== -1) {
                 siblings[idx] = newParent;
             } else {
-                // Fallback: append if not found
                 siblings.push(newParent);
             }
             parent.data.children = siblings;
         } else {
-            // Old node was root; newParent becomes the new root
             this.rootData = newParent;
         }
 
-        // Re-render and open the new parent's editor
         this.renderFlowchart(this.rootData);
-        // Find the d3 node corresponding to newParent
         let found = null;
         d3.hierarchy(this.rootData).each(node => {
             if (node.data === newParent) found = node;
         });
         if (found) {
-            // Open editor and focus/select for typing
             this.showNodeEditPopup(found);
-            // Ensure input is empty and focused
             this.nodeEditInput.value = '';
             this.nodeEditInput.focus();
             this.nodeEditInput.select();
         }
         this.updateUndoRedoButtons();
+        this.autosave();
     }
 
-    // Duplicate the given node (excluding its children) as a child of each of its parent's siblings
     duplicateNodeToParentSiblings(d) {
         if (!d || !d.parent) {
             alert('Cannot duplicate: node has no parent.');
@@ -1058,21 +1006,16 @@ class FlowchartViewer {
 
         this.pushUndo();
 
-        // Create a shallow copy of node data excluding children
         const nodeCopy = {};
         for (const key in d.data) {
             if (key === 'children') continue;
-            // copy primitive values (name, color, etc.)
             nodeCopy[key] = JSON.parse(JSON.stringify(d.data[key]));
         }
 
-        // For each sibling of the parent (i.e., other children of grandparent), add the copy as a child
         const siblings = (grandparent.data.children || []).filter(child => child !== parent.data);
         siblings.forEach(sibData => {
             if (!sibData.children) sibData.children = [];
-            // Insert a fresh copy for each sibling
             const newNode = JSON.parse(JSON.stringify(nodeCopy));
-            // Ensure a unique name if name collision occurs among siblings' children
             const existingNames = sibData.children.map(c => c.name);
             let baseName = newNode.name || 'New Node';
             let newName = baseName;
@@ -1086,10 +1029,10 @@ class FlowchartViewer {
 
         this.renderFlowchart(this.rootData);
         this.updateUndoRedoButtons();
+        this.autosave();
     }
 
     addSiblingNode(d, direction) {
-        // direction: -1 => left (before), 1 => right (after)
         if (!d.parent) {
             alert('Cannot add a sibling to the root node.');
             return null;
@@ -1098,7 +1041,6 @@ class FlowchartViewer {
         const parent = d.parent;
         if (!parent.data.children) parent.data.children = [];
         const siblings = parent.data.children;
-        // Generate unique sibling name
         let baseName = 'New Node';
         let idx = 1;
         const siblingNames = siblings.map(child => child.name);
@@ -1111,60 +1053,54 @@ class FlowchartViewer {
         const insertAt = direction < 0 ? idxPos : idxPos + 1;
         siblings.splice(insertAt, 0, newSibling);
         this.renderFlowchart(this.rootData);
-        // Open editor for the newly created sibling
         let found = null;
         d3.hierarchy(this.rootData).each(node => {
             if (node.data === newSibling) found = node;
         });
         if (found) this.showNodeEditPopup(found);
         this.updateUndoRedoButtons();
+        this.autosave();
         return newSibling;
     }
 
     deleteNode(d) {
-        // Prevent deleting root
         if (!d.parent) {
             alert("Cannot delete the root node.");
             return;
         }
         this.pushUndo();
-        // Remove from parent's children
         const parent = d.parent;
         parent.data.children = (parent.data.children || []).filter(child => child !== d.data);
         if (parent.data.children.length === 0) delete parent.data.children;
-        // Remove any connections involving this node
         this.customConnections = this.customConnections.filter(conn =>
             conn.source !== d.data && conn.target !== d.data
         );
         this.renderFlowchart(this.rootData);
         this.updateUndoRedoButtons();
+        this.autosave();
     }
 
     showNodeEditPopup(d) {
         this.nodeBeingEdited = d;
         
-        // Check if leaf node and green - append "(Simplify?)" if needed
         let displayName = d.data.name;
         if (this.isLeafNode(d) && this.isGreenNode(d)) {
             if (!displayName.endsWith(' (Simplify?)')) {
                 displayName = displayName + ' (Simplify?)';
             }
         } else {
-            // Remove "(Simplify?)" if it exists and node is no longer a leaf/green
             if (displayName.endsWith(' (Simplify?)')) {
                 displayName = displayName.substring(0, displayName.length - ' (Simplify?)'.length);
             }
         }
         
         this.nodeEditInput.value = displayName;
-        // Focus and select all text for quick editing
         this.nodeEditInput.focus();
         this.nodeEditInput.select();
-        // Ensure selection occurs after popup is inserted/focused in all browsers
         setTimeout(() => {
             try { this.nodeEditInput.select(); } catch (e) { /* ignore */ }
         }, 0);
-        // Add node action buttons above color buttons if not already present
+        
         let nodeActionBtns = document.getElementById('node-action-btns');
         if (!nodeActionBtns) {
             nodeActionBtns = document.createElement('div');
@@ -1173,7 +1109,8 @@ class FlowchartViewer {
             nodeActionBtns.style.gap = '10px';
             nodeActionBtns.style.marginBottom = '10px';
             nodeActionBtns.style.justifyContent = 'center';
-            // Add Child
+            nodeActionBtns.style.flexWrap = 'wrap';
+            
             const addChildBtn = document.createElement('button');
             addChildBtn.textContent = 'Add Child';
             addChildBtn.style.background = '#f0f0f0';
@@ -1194,15 +1131,13 @@ class FlowchartViewer {
                         });
                         if (found) {
                             this.showNodeEditPopup(found);
-                            // Clear and focus input for new child
                             this.nodeEditInput.value = '';
                             this.nodeEditInput.focus();
                         }
                     }
                 }
             };
-            // Note: Move controls are placed in a separate row below
-            // Add Parent
+            
             const addParentBtn = document.createElement('button');
             addParentBtn.textContent = 'Add Parent';
             addParentBtn.style.background = '#f0f0f0';
@@ -1215,7 +1150,7 @@ class FlowchartViewer {
                 this.hideNodeEditPopup();
                 this.addParentNode(d);
             };
-            // Make Connection
+            
             const makeConnBtn = document.createElement('button');
             makeConnBtn.textContent = 'Make Connection';
             makeConnBtn.style.background = '#f0f0f0';
@@ -1228,7 +1163,7 @@ class FlowchartViewer {
                 this.hideNodeEditPopup();
                 this.startMakeConnection(d);
             };
-            // Duplicate Node to parent's siblings
+            
             const duplicateBtn = document.createElement('button');
             duplicateBtn.textContent = 'Duplicate Node';
             duplicateBtn.style.background = '#f0f0f0';
@@ -1241,7 +1176,7 @@ class FlowchartViewer {
                 this.hideNodeEditPopup();
                 this.duplicateNodeToParentSiblings(d);
             };
-            // Delete Node
+            
             const deleteNodeBtn = document.createElement('button');
             deleteNodeBtn.textContent = 'Delete Node';
             deleteNodeBtn.style.background = '#f0f0f0';
@@ -1254,7 +1189,7 @@ class FlowchartViewer {
                 this.hideNodeEditPopup();
                 this.deleteNode(d);
             };
-            // Delete Node but promote its children up into the parent at the same position
+            
             const deletePromoteBtn = document.createElement('button');
             deletePromoteBtn.textContent = 'Delete Node (Promote Children)';
             deletePromoteBtn.style.background = '#ffecec';
@@ -1265,7 +1200,6 @@ class FlowchartViewer {
             deletePromoteBtn.style.cursor = 'pointer';
             deletePromoteBtn.onclick = () => {
                 this.hideNodeEditPopup();
-                // Implement promote-children deletion
                 if (!d.parent) {
                     alert('Cannot delete the root node.');
                     return;
@@ -1275,22 +1209,19 @@ class FlowchartViewer {
                 const siblings = parent.data.children || [];
                 const idx = siblings.indexOf(d.data);
                 const children = d.data.children || [];
-                // Remove the node and insert its children at the same index
                 if (idx !== -1) {
-                    // Remove the node
                     siblings.splice(idx, 1);
                     if (children.length > 0) {
-                        // Insert children in place
                         siblings.splice(idx, 0, ...children);
                     }
                 }
-                // Clean up: if parent has no children, remove the children property
                 if (parent.data.children && parent.data.children.length === 0) delete parent.data.children;
-                // Remove any custom connections involving the deleted node
                 this.customConnections = this.customConnections.filter(conn => conn.source !== d.data && conn.target !== d.data);
                 this.renderFlowchart(this.rootData);
                 this.updateUndoRedoButtons();
+                this.autosave();
             };
+            
             nodeActionBtns.appendChild(addChildBtn);
             nodeActionBtns.appendChild(addParentBtn);
             nodeActionBtns.appendChild(makeConnBtn);
@@ -1299,13 +1230,13 @@ class FlowchartViewer {
             nodeActionBtns.appendChild(deletePromoteBtn);
             this.nodeEditPopup.insertBefore(nodeActionBtns, this.nodeEditPopup.firstChild);
 
-            // Create a second row for sibling controls (Add Sibling Left, Add Sibling Right)
             const nodeSiblingBtns = document.createElement('div');
             nodeSiblingBtns.id = 'node-sibling-btns';
             nodeSiblingBtns.style.display = 'flex';
             nodeSiblingBtns.style.gap = '10px';
             nodeSiblingBtns.style.margin = '8px 0 6px 0';
             nodeSiblingBtns.style.justifyContent = 'center';
+            nodeSiblingBtns.style.flexWrap = 'wrap';
 
             const addSiblingLeftBtn = document.createElement('button');
             addSiblingLeftBtn.textContent = 'Add Sibling Left';
@@ -1337,13 +1268,13 @@ class FlowchartViewer {
             nodeSiblingBtns.appendChild(addSiblingRightBtn);
             this.nodeEditPopup.insertBefore(nodeSiblingBtns, this.nodeEditPopup.firstChild);
 
-            // Create a third row for move controls (Move, Move Left, Move Right)
             const nodeMoveBtns = document.createElement('div');
             nodeMoveBtns.id = 'node-move-btns';
             nodeMoveBtns.style.display = 'flex';
             nodeMoveBtns.style.gap = '10px';
             nodeMoveBtns.style.margin = '8px 0 12px 0';
             nodeMoveBtns.style.justifyContent = 'center';
+            nodeMoveBtns.style.flexWrap = 'wrap';
 
             const moveBtn = document.createElement('button');
             moveBtn.textContent = 'Move';
@@ -1367,7 +1298,6 @@ class FlowchartViewer {
             moveLeftBtn.style.cursor = 'pointer';
             moveLeftBtn.onclick = () => {
                 this.hideNodeEditPopup();
-                // Move within siblings to the left
                 this.moveNodeInSiblings(d, -1);
             };
 
@@ -1380,7 +1310,6 @@ class FlowchartViewer {
             moveRightBtn.style.cursor = 'pointer';
             moveRightBtn.onclick = () => {
                 this.hideNodeEditPopup();
-                // Move within siblings to the right
                 this.moveNodeInSiblings(d, 1);
             };
 
@@ -1389,7 +1318,7 @@ class FlowchartViewer {
             nodeMoveBtns.appendChild(moveRightBtn);
             this.nodeEditPopup.insertBefore(nodeMoveBtns, this.nodeEditPopup.firstChild);
         }
-        // Add color buttons above the input if not already present
+        
         let colorBtns = document.getElementById('node-color-btns');
         if (!colorBtns) {
             colorBtns = document.createElement('div');
@@ -1398,7 +1327,8 @@ class FlowchartViewer {
             colorBtns.style.gap = '10px';
             colorBtns.style.marginBottom = '10px';
             colorBtns.style.justifyContent = 'center';
-            // Green button
+            colorBtns.style.flexWrap = 'wrap';
+            
             const greenBtn = document.createElement('button');
             greenBtn.textContent = 'Green';
             greenBtn.style.background = '#00a67e';
@@ -1415,13 +1345,13 @@ class FlowchartViewer {
                     }
                     this.nodeBeingEdited.data.color = '#00a67e';
                     this.ensureRightmostPlaceholderNodes(this.rootData);
-                    // Update all simplify suffixes after color change
                     this.updateSimplifyPrefixes(d3.hierarchy(this.rootData));
                     this.renderFlowchart(this.rootData);
-                    this.showNodeEditPopup(this.nodeBeingEdited); // re-show popup to keep editing
+                    this.showNodeEditPopup(this.nodeBeingEdited);
+                    this.autosave();
                 }
             };
-            // Pink button
+            
             const pinkBtn = document.createElement('button');
             pinkBtn.textContent = 'Pink';
             pinkBtn.style.background = '#e75480';
@@ -1437,21 +1367,19 @@ class FlowchartViewer {
                         this.markNodeAsReal(this.nodeBeingEdited.data);
                     }
                     this.nodeBeingEdited.data.color = '#e75480';
-                    // Prefix name with Assumption: if not already present
                     if (!/^Assumption:\s/.test(this.nodeBeingEdited.data.name)) {
                         this.nodeBeingEdited.data.name = 'Assumption: ' + (this.nodeBeingEdited.data.name || '');
                     }
                     this.ensureRightmostPlaceholderNodes(this.rootData);
-                    // Update all simplify suffixes after color change
                     this.updateSimplifyPrefixes(d3.hierarchy(this.rootData));
                     this.renderFlowchart(this.rootData);
                     this.showNodeEditPopup(this.nodeBeingEdited);
-                    // Update input value and select for quick typing
                     this.nodeEditInput.value = this.nodeBeingEdited.data.name;
                     setTimeout(() => { try { this.nodeEditInput.select(); } catch (e) {} }, 0);
+                    this.autosave();
                 }
             };
-            // Blue button
+            
             const blueBtn = document.createElement('button');
             blueBtn.textContent = 'Blue';
             blueBtn.style.background = '#0074d9';
@@ -1468,13 +1396,13 @@ class FlowchartViewer {
                     }
                     this.nodeBeingEdited.data.color = '#0074d9';
                     this.ensureRightmostPlaceholderNodes(this.rootData);
-                    // Update all simplify suffixes after color change
                     this.updateSimplifyPrefixes(d3.hierarchy(this.rootData));
                     this.renderFlowchart(this.rootData);
                     this.showNodeEditPopup(this.nodeBeingEdited);
+                    this.autosave();
                 }
             };
-            // Yellow button
+            
             const yellowBtn = document.createElement('button');
             yellowBtn.textContent = 'Yellow';
             yellowBtn.style.background = '#ffcc00';
@@ -1491,13 +1419,13 @@ class FlowchartViewer {
                     }
                     this.nodeBeingEdited.data.color = '#ffcc00';
                     this.ensureRightmostPlaceholderNodes(this.rootData);
-                    // Update all simplify suffixes after color change
                     this.updateSimplifyPrefixes(d3.hierarchy(this.rootData));
                     this.renderFlowchart(this.rootData);
                     this.showNodeEditPopup(this.nodeBeingEdited);
+                    this.autosave();
                 }
             };
-            // Empty button
+            
             const emptyBtn = document.createElement('button');
             emptyBtn.textContent = 'Empty';
             emptyBtn.style.background = '#323a4a';
@@ -1513,12 +1441,13 @@ class FlowchartViewer {
                     this.nodeBeingEdited.data.name = '';
                     this.nodeBeingEdited.data._isPlaceholder = true;
                     this.ensureRightmostPlaceholderNodes(this.rootData);
-                    // Update all simplify suffixes after color change
                     this.updateSimplifyPrefixes(d3.hierarchy(this.rootData));
                     this.renderFlowchart(this.rootData);
                     this.showNodeEditPopup(this.nodeBeingEdited);
+                    this.autosave();
                 }
             };
+            
             colorBtns.appendChild(greenBtn);
             colorBtns.appendChild(pinkBtn);
             colorBtns.appendChild(blueBtn);
@@ -1526,7 +1455,7 @@ class FlowchartViewer {
             colorBtns.appendChild(emptyBtn);
             this.nodeEditPopup.insertBefore(colorBtns, this.nodeEditPopup.firstChild);
         }
-        // Highlight selected color
+        
         Array.from(colorBtns.children).forEach(btn => {
             if (btn.textContent === 'Green' && d.data.color === '#00a67e') {
                 btn.style.outline = '2px solid #00a67e';
@@ -1546,7 +1475,6 @@ class FlowchartViewer {
     }
 
     moveNodeInSiblings(d, direction) {
-        // Only move if node has a parent
         if (!d.parent) return;
         const siblings = d.parent.data.children;
         const idx = siblings.indexOf(d.data);
@@ -1554,23 +1482,20 @@ class FlowchartViewer {
         const newIdx = idx + direction;
         if (newIdx < 0 || newIdx >= siblings.length) return;
         this.pushUndo();
-        // Swap positions
         [siblings[idx], siblings[newIdx]] = [siblings[newIdx], siblings[idx]];
         this.renderFlowchart(this.rootData);
-        // Keep popup open on the same node
-        // Find the new d3.hierarchy node for the same data
         let found = null;
         d3.hierarchy(this.rootData).each(node => {
             if (node.data === d.data) found = node;
         });
         if (found) this.showNodeEditPopup(found);
+        this.autosave();
     }
 
     hideNodeEditPopup(save = true) {
         if (save) this.saveNodeEdit();
         this.nodeEditPopup.style.display = 'none';
         this.nodeBeingEdited = null;
-        // Remove color, move, and action buttons
         const colorBtns = document.getElementById('node-color-btns');
         if (colorBtns) colorBtns.remove();
         const moveBtns = document.getElementById('node-move-btns');
@@ -1588,20 +1513,17 @@ class FlowchartViewer {
         const isRootPlaceholder = this.isRootPlaceholderNode(this.nodeBeingEdited);
         let newName = this.nodeEditInput.value.trim();
         
-        // If node is pink, ensure prefix is present
         if (originalData && originalData.color === '#e75480') {
             if (!/^Assumption:\s/.test(newName)) {
                 newName = 'Assumption: ' + newName;
             }
         }
         
-        // If node is leaf and green, ensure "(Simplify?)" suffix is present
         if (this.isLeafNode(this.nodeBeingEdited) && this.isGreenNode(this.nodeBeingEdited)) {
             if (!newName.endsWith(' (Simplify?)')) {
                 newName = newName + ' (Simplify?)';
             }
         } else {
-            // Remove "(Simplify?)" if it exists and node is no longer a leaf/green
             if (newName.endsWith(' (Simplify?)')) {
                 newName = newName.substring(0, newName.length - ' (Simplify?)'.length);
             }
@@ -1617,17 +1539,14 @@ class FlowchartViewer {
                 this.rootData = this.wrapRootWithPlaceholder(this.rootData);
             }
             this.ensureRightmostPlaceholderNodes(this.rootData);
-            // Update all simplify suffixes after name change
             this.updateSimplifyPrefixes(d3.hierarchy(this.rootData));
             this.renderFlowchart(this.rootData);
+            this.autosave();
         }
-        // Don't call hideNodeEditPopup here to avoid recursion
-        this.hideContextMenu(); // Hide context menu when saving edit
+        this.hideContextMenu();
     }
 
-    // Export the current flowchart as JSON (tree + custom connections)
     exportAsJSON() {
-        // Remove circular references for export
         function stripParents(node) {
             const { name, children, color } = node;
             const out = { name };
@@ -1645,7 +1564,15 @@ class FlowchartViewer {
         }, null, 2);
     }
 
-    // Export the current flowchart as indented text (legacy)
+    exportAllAsJSON() {
+        this.saveCurrentFlowchart();
+        const exportData = this.flowchartList.map(item => ({
+            title: item.title,
+            data: item.data
+        }));
+        return JSON.stringify(exportData, null, 2);
+    }
+
     exportAsText() {
         function walk(node, depth = 0) {
             let lines = [];
@@ -1661,64 +1588,133 @@ class FlowchartViewer {
     }
 
     showExportPopup() {
-        // Show JSON export by default
-        this.exportTextarea.value = this.exportAsJSON();
+        this.exportTextarea.value = this.exportAllAsJSON();
         this.exportPopup.style.display = 'block';
         this.exportTextarea.select();
+        
+        if (!document.getElementById('open-file-export-btn')) {
+            const buttonContainer = this.exportPopup.querySelector('div:last-child');
+            const openFileBtn = document.createElement('button');
+            openFileBtn.id = 'open-file-export-btn';
+            openFileBtn.textContent = 'Open Text File';
+            openFileBtn.style.cssText = 'font-size:15px; padding:6px 18px; border:1px solid #aaa; border-radius:5px; background:#e0f0ff; cursor:pointer; margin-right:8px;';
+            openFileBtn.addEventListener('click', () => this.openFileForExport());
+            buttonContainer.insertBefore(openFileBtn, buttonContainer.firstChild);
+            
+            const saveBtn = document.createElement('button');
+            saveBtn.id = 'save-file-export-btn';
+            saveBtn.textContent = 'Save to File';
+            saveBtn.style.cssText = 'font-size:15px; padding:6px 18px; border:1px solid #aaa; border-radius:5px; background:#e0ffe0; cursor:pointer; margin-right:8px;';
+            saveBtn.addEventListener('click', () => this.saveExportToFile());
+            buttonContainer.insertBefore(saveBtn, buttonContainer.firstChild);
+        }
+    }
+    
+    openFileForExport() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.txt,.json,text/plain,application/json';
+        input.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const content = e.target.result;
+                    JSON.parse(content);
+                    this.exportTextarea.value = content;
+                    this.exportTextarea.select();
+                    this.showNotification('File loaded successfully');
+                } catch (error) {
+                    alert('The file does not contain valid JSON content');
+                }
+            };
+            reader.readAsText(file);
+        });
+        input.click();
+    }
+    
+    saveExportToFile() {
+        const content = this.exportTextarea.value;
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'flowcharts.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        this.showNotification('File saved');
     }
 
-    // Import flowchart from JSON or indented text
     importFromText() {
         const text = this.importTextarea.value;
         if (!text.trim()) {
-            alert("Paste exported JSON or indented text to import.");
+            alert("Paste exported JSON to import.");
             return;
         }
         try {
-            let data, customConnections = [];
-            // Try JSON first
-            try {
-                const parsed = JSON.parse(text);
-                if (parsed && parsed.tree) {
-                    data = parsed.tree;
-                    customConnections = parsed.customConnections || [];
-                } else {
-                    throw new Error("Not a valid flowchart JSON.");
-                }
-            } catch (jsonErr) {
-                // Fallback to indented text
-                data = this.parseIndentedText(text);
-                customConnections = [];
-            }
-            this.pushUndo();
-            // Rebuild customConnections with references to node objects
-            this.renderFlowchart(data);
-            if (customConnections.length > 0) {
-                // Map node names to node objects
-                const nodeMap = new Map();
-                d3.hierarchy(this.rootData).each(d => nodeMap.set(d.data.name, d.data));
-                this.customConnections = customConnections
-                    .map(conn => {
-                        const source = nodeMap.get(conn.source);
-                        const target = nodeMap.get(conn.target);
-                        if (source && target) {
-                            return {
-                                source,
-                                target,
-                                _offset: conn._offset || 0
-                            };
-                        }
-                        return null;
-                    })
-                    .filter(Boolean);
-                // Re-render to show connections
-                this.renderFlowchart(this.rootData);
+            const importedData = JSON.parse(text);
+            
+            let flowchartsToImport = [];
+            if (Array.isArray(importedData)) {
+                flowchartsToImport = importedData;
+            } else if (importedData.tree) {
+                flowchartsToImport = [{
+                    title: `Imported Flowchart ${this.flowchartList.length + 1}`,
+                    data: text
+                }];
             } else {
-                this.customConnections = [];
+                throw new Error("Invalid format. Expected array of flowcharts or a single flowchart.");
             }
+            
+            flowchartsToImport = flowchartsToImport.filter(item => item && item.data);
+            
+            if (flowchartsToImport.length === 0) {
+                alert("No valid flowcharts found in the import data.");
+                return;
+            }
+            
+            let saveCurrent = false;
+            if (this.currentSlotIndex !== null && this.flowchartList[this.currentSlotIndex]) {
+                saveCurrent = confirm("Save the current flowchart before importing?");
+            }
+            
+            if (saveCurrent) {
+                this.saveCurrentFlowchart();
+            }
+            
+            this.loadFlowchartList();
+            
+            let addedCount = 0;
+            flowchartsToImport.forEach(item => {
+                try {
+                    JSON.parse(item.data);
+                    this.flowchartList.push({
+                        title: item.title || `Imported Flowchart ${this.flowchartList.length + 1}`,
+                        data: item.data
+                    });
+                    addedCount++;
+                } catch (e) {
+                    console.warn('Skipping invalid flowchart entry:', e);
+                }
+            });
+            
+            this.saveFlowchartList();
             this.importPopup.style.display = 'none';
+            
+            if (addedCount > 0) {
+                const newIndex = this.flowchartList.length - addedCount;
+                this.loadFlowchartFromList(newIndex);
+                this.showNotification(`Imported ${addedCount} flowchart(s)!`);
+            } else {
+                this.showNotification('No valid flowcharts were imported.');
+            }
+            
         } catch (e) {
-            alert("Failed to import. Make sure the format is correct.");
+            alert("Failed to import. Make sure the format is correct: " + e.message);
         }
     }
 
@@ -1726,9 +1722,36 @@ class FlowchartViewer {
         this.importTextarea.value = '';
         this.importPopup.style.display = 'block';
         this.importTextarea.focus();
+        
+        if (!document.getElementById('open-file-import-btn')) {
+            const buttonContainer = this.importPopup.querySelector('div:last-child');
+            const openFileBtn = document.createElement('button');
+            openFileBtn.id = 'open-file-import-btn';
+            openFileBtn.textContent = 'Open Text File';
+            openFileBtn.style.cssText = 'font-size:15px; padding:6px 18px; border:1px solid #aaa; border-radius:5px; background:#e0f0ff; cursor:pointer; margin-right:8px;';
+            openFileBtn.addEventListener('click', () => this.openFileForImport());
+            buttonContainer.insertBefore(openFileBtn, buttonContainer.firstChild);
+        }
+    }
+    
+    openFileForImport() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.txt,.json,text/plain,application/json';
+        input.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                this.importTextarea.value = e.target.result;
+                this.showNotification('File loaded for import');
+            };
+            reader.readAsText(file);
+        });
+        input.click();
     }
 
-    // Parse indented text into tree structure
     parseIndentedText(text) {
         const lines = text.split('\n').filter(line => line.trim().length > 0);
         const rootStack = [];
@@ -1757,7 +1780,6 @@ class FlowchartViewer {
         return root;
     }
 
-    // Store per-connection offset for custom connections
     getConnectionOffset(conn) {
         if (!conn._offset) conn._offset = 0;
         return conn._offset;
@@ -1766,27 +1788,22 @@ class FlowchartViewer {
         conn._offset = offset;
     }
 
-    // Move selected connection by dx
     moveSelectedConnection(dx) {
         if (!this.selectedConnection) return;
         this.pushUndo();
         this.setConnectionOffset(this.selectedConnection, this.getConnectionOffset(this.selectedConnection) + dx);
         this.renderFlowchart(this.rootData);
-        // Keep the connection selected after re-render
         setTimeout(() => this.selectConnectionByData(this.selectedConnection), 0);
+        this.autosave();
     }
 
-    // Select a connection (by data object)
     selectConnectionByData(conn) {
         this.selectedConnection = conn;
-        // Show controls
         this.connectionControlsRow.style.display = 'flex';
         this.connectionControls.style.display = 'flex';
-        // Highlight the selected connection
         d3.selectAll('.custom-link').classed('selected', d => d === conn);
     }
 
-    // Deselect connection
     deselectConnection() {
         this.selectedConnection = null;
         this.connectionControlsRow.style.display = 'none';
@@ -1794,11 +1811,8 @@ class FlowchartViewer {
         d3.selectAll('.custom-link').classed('selected', false);
     }
 
-    // Node selection logic (sibling control row removed)
     selectNode(d) {
         this.selectedNode = d;
-        // The sibling add buttons row has been removed per design.
-        // Ensure the node controls row remains hidden and empty.
         this.nodeControlsRow.style.display = 'none';
         this.nodeControlsRow.innerHTML = '';
     }
@@ -1814,53 +1828,52 @@ class FlowchartViewer {
     deleteSelectedConnection() {
         if (!this.selectedConnection) return;
         this.pushUndo();
-        // Remove the selected connection from customConnections
         this.customConnections = this.customConnections.filter(conn => conn !== this.selectedConnection);
         this.deselectConnection();
         this.renderFlowchart(this.rootData);
+        this.autosave();
+    }
+
+    syncTransform() {
+        const oldSvg = this.flowchartContainer.querySelector('svg');
+        if (oldSvg) {
+            this.transform = d3.zoomTransform(oldSvg);
+        }
     }
 
     renderFlowchart(data) {
-        // Save root data for move operations
+        this.syncTransform();
         this.rootData = this.wrapRootWithPlaceholder(data);
+        
         const contentRoot = this.rootData.children && this.rootData.children.length > 0
             ? this.rootData.children[0]
             : this.rootData;
         this.ensureRightmostPlaceholderNodes(contentRoot);
         
-        // Update all simplify suffixes before rendering
         const rootHierarchy = d3.hierarchy(this.rootData);
         this.updateSimplifyPrefixes(rootHierarchy);
         
-        // Clear previous flowchart
         this.flowchartContainer.innerHTML = '';
 
-        // Set up SVG dimensions
         const width = this.flowchartPanel.clientWidth;
         const height = this.flowchartPanel.clientHeight;
 
-        // Create SVG
         const svg = d3.select('#flowchart')
             .append('svg')
             .attr('width', width)
             .attr('height', height)
             .attr('viewBox', `0 0 ${width} ${height}`);
 
-        // Create root group
         const g = svg.append('g');
 
-        // Set up zoom behavior
         this.setupZoom(svg, g);
 
-        // Create tree layout
         const treeLayout = d3.tree()
             .nodeSize([150, 200]);
 
-        // Create hierarchy from the wrapped root so placeholder nodes are rendered immediately
         const root = d3.hierarchy(this.rootData);
         treeLayout(root);
 
-        // Draw links with filleted corners (vertical/horizontal lines)
         const cornerRadius = 10;
         g.append('g')
             .selectAll('path')
@@ -1869,7 +1882,6 @@ class FlowchartViewer {
             .append('path')
             .attr('class', 'link')
             .attr('d', d => {
-                // Snap x/y to nearest 10 for vertical/horizontal segments
                 const snap10 = v => Math.round(v / 10) * 10;
                 const sourceX = snap10(d.source.x);
                 const sourceY = snap10(d.source.y);
@@ -1890,7 +1902,6 @@ class FlowchartViewer {
                 `;
             });
 
-        // Draw custom connections
         if (this.customConnections.length > 0) {
             const nodeMap = new Map();
             root.each(d => {
@@ -1903,25 +1914,9 @@ class FlowchartViewer {
 
             const customLinksGroup = g.append('g');
 
-            // Default vertical entry distance for connectors (matches tree layout)
             const verticalEntry = 80;
-            const fillet = 10; // radius for corner fillets (match cornerRadius)
+            const fillet = 10;
 
-            // Helper for fillet path
-            function filletPath(sx, sy, ex, ey, r, horizontalFirst = true) {
-                // Only supports 90-degree corners
-                if (horizontalFirst) {
-                    return `L ${ex - Math.sign(ex - sx) * r},${sy}
-                        Q ${ex},${sy} ${ex},${sy + Math.sign(ey - sy) * r}
-                        L ${ex},${ey}`;
-                } else {
-                    return `L ${sx},${ey - Math.sign(ey - sy) * r}
-                        Q ${sx},${ey} ${sx + Math.sign(ex - sx) * r},${ey}
-                        L ${ex},${ey}`;
-                }
-            }
-
-            // Draw wide invisible hit areas for easier selection
             customLinksGroup
                 .selectAll('.custom-link-hit')
                 .data(this.customConnections)
@@ -1929,7 +1924,6 @@ class FlowchartViewer {
                 .append('path')
                 .attr('class', 'custom-link-hit')
                 .attr('d', d => {
-                    // Snap x/y to nearest 10 for vertical/horizontal segments
                     const snap10 = v => Math.round(v / 10) * 10;
                     const source = nodeMap.get(d.source);
                     const target = nodeMap.get(d.target);
@@ -1968,7 +1962,6 @@ class FlowchartViewer {
                     }
                 });
 
-            // Draw actual visible connection lines above hit areas
             customLinksGroup
                 .selectAll('.custom-link')
                 .data(this.customConnections)
@@ -1977,7 +1970,6 @@ class FlowchartViewer {
                 .attr('class', 'custom-link link')
                 .classed('selected', d => d === this.selectedConnection)
                 .attr('d', d => {
-                    // Snap x/y to nearest 10 for vertical/horizontal segments
                     const snap10 = v => Math.round(v / 10) * 10;
                     const source = nodeMap.get(d.source);
                     const target = nodeMap.get(d.target);
@@ -2012,26 +2004,22 @@ class FlowchartViewer {
                     }
                 });
 
-            // Deselect connection on background click
             d3.select('svg').on('click.deselectconn', (event) => {
                 if (event.target.tagName === 'svg') {
                     this.deselectConnection();
                 }
             });
         } else {
-            // Remove deselect handler if no custom connections
             d3.select('svg').on('click.deselectconn', null);
             this.deselectConnection();
         }
 
-        // Draw nodes
         const node = g.append('g')
             .selectAll('.node')
             .data(root.descendants())
             .enter()
             .append('g')
             .attr('class', 'node')
-            // Snap node x to nearest 10
             .attr('transform', d => {
                 const snap10 = v => Math.round(v / 10) * 10;
                 return `translate(${snap10(d.x)},${d.y})`;
@@ -2042,7 +2030,6 @@ class FlowchartViewer {
                 }
             })
             .on('click', (event, d) => {
-                // Only show node edit popup on left click
                 if (event.button === 0) {
                     if (this.skipNextNodeClick) {
                         this.skipNextNodeClick = false;
@@ -2059,14 +2046,12 @@ class FlowchartViewer {
                 this.selectNode(d);
             });
 
-        // Add rectangles and wrapped text to nodes
         const NODE_WIDTH = 120;
         const LINE_HEIGHT = 18;
         const PADDING_Y = 12;
         const FONT_SIZE = 13;
         const FONT_FAMILY = 'Arial, sans-serif';
 
-        // Helper to measure text width in SVG
         function measureTextWidth(text) {
             const svg = d3.select('body').append('svg').attr('style', 'position:absolute;left:-9999px;top:-9999px');
             const tempText = svg.append('text')
@@ -2083,13 +2068,12 @@ class FlowchartViewer {
             if (rawName) {
                 d.data.name = rawName.replace(/^\s*\S/, ch => ch.toUpperCase());
             }
-            const words = d.data.name.split(/(\s+)/); // keep spaces
+            const words = d.data.name.split(/(\s+)/);
             let lines = [];
             let current = '';
             words.forEach(word => {
                 const testLine = (current + word).trim();
-                if (testLine && measureTextWidth(testLine) > NODE_WIDTH - 16) // 16px padding
-                {
+                if (testLine && measureTextWidth(testLine) > NODE_WIDTH - 16) {
                     if (current) lines.push(current.trim());
                     current = word.trim();
                 } else {
@@ -2100,7 +2084,6 @@ class FlowchartViewer {
             d._lines = lines.length ? lines : [d.data.name || ''];
         });
 
-        // In the renderFlowchart method, modify the node.append('rect') section:
         node.append('rect')
         .attr('width', NODE_WIDTH)
         .attr('height', d => d._lines.length * LINE_HEIGHT + PADDING_Y)
@@ -2110,22 +2093,18 @@ class FlowchartViewer {
             if (this.isPlaceholderNodeData(d.data) || !(d.data.name || '').trim()) {
                 return this.getPlaceholderColor();
             }
-            // Create a map of all nodes that are sources of custom connections
             const sourceNodes = new Set(this.customConnections.map(conn => conn.source));
-            // Determine if node is a parent (has children or outgoing connections)
             const hasHierarchicalChildren = d.children && d.children.length > 0;
             const hasCustomConnections = sourceNodes.has(d.data);
             const isParentNode = hasHierarchicalChildren || hasCustomConnections;
-            // For parent nodes
             if (isParentNode) {
-                return d.data.color || '#00a67e'; // Green by default
+                return d.data.color || '#00a67e';
             }
-            // For leaf nodes, just use explicit color or default green
             return d.data.color || '#00a67e';
         })
         .attr('stroke', d => this.isPlaceholderNodeData(d.data) || !(d.data.name || '').trim() ? this.getPlaceholderColor() : '#999')
         .attr('stroke-width', d => this.isPlaceholderNodeData(d.data) || !(d.data.name || '').trim() ? '0' : '1.5px');
-        // Then create the text elements with dynamic color
+
         node.append('text')
         .attr('text-anchor', 'middle')
         .attr('font-size', FONT_SIZE)
@@ -2135,7 +2114,6 @@ class FlowchartViewer {
                 return this.getPlaceholderColor();
             }
             const fill = d.data.color || '#00a67e';
-            // Convert hex color to RGB
             function hexToRgb(hex) {
                 if (!hex) return { r: 0, g: 0, b: 0 };
                 if (hex[0] === '#') hex = hex.slice(1);
@@ -2144,7 +2122,6 @@ class FlowchartViewer {
                 return { r: (int >> 16) & 255, g: (int >> 8) & 255, b: int & 255 };
             }
             const { r, g, b } = hexToRgb(fill);
-            // Perceived brightness formula
             const brightness = (r * 299 + g * 587 + b * 114) / 1000;
             return brightness > 150 ? '#000000' : '#ffffff';
         })
@@ -2159,21 +2136,47 @@ class FlowchartViewer {
         .attr('y', d => d.y)
         .text(d => d.line);
 
-        // Only center the view on initial load or reset, not after every render
-        if (!this._hasInitialView) {
+        const isIdentity = (t) => t.k === 1 && t.x === 0 && t.y === 0;
+        if (isIdentity(this.transform)) {
             const bounds = g.node().getBBox();
             const scale = 0.9 / Math.max(bounds.width / width, bounds.height / height);
             const tx = (width - bounds.width * scale) / 2 - bounds.x * scale;
             const ty = (height - bounds.height * scale) / 2 - bounds.y * scale;
-            g.attr('transform', `translate(${tx},${ty}) scale(${scale})`);
             this.transform = d3.zoomIdentity.translate(tx, ty).scale(scale);
-            this._hasInitialView = true;
+            g.attr('transform', this.transform);
+            svg.call(this._zoomBehavior.transform, this.transform);
         } else {
-            // Maintain previous transform (no auto-centering)
             g.attr('transform', this.transform);
         }
 
         this.updateUndoRedoButtons();
+    }
+
+    showNotification(message, duration = 3000) {
+        const notif = document.createElement('div');
+        notif.className = 'flowchart-notification';
+        notif.textContent = message;
+        Object.assign(notif.style, {
+            position: 'fixed',
+            right: '20px',
+            bottom: '20px',
+            background: 'rgba(0,0,0,0.85)',
+            color: '#fff',
+            padding: '10px 14px',
+            borderRadius: '6px',
+            zIndex: 9999,
+            boxShadow: '0 6px 18px rgba(0,0,0,0.3)',
+            opacity: '1',
+            transition: 'opacity 300ms ease',
+            maxWidth: '400px'
+        });
+        document.body.appendChild(notif);
+        setTimeout(() => {
+            notif.style.opacity = '0';
+            setTimeout(() => {
+                try { notif.remove(); } catch (e) {}
+            }, 300);
+        }, duration);
     }
 }
 
