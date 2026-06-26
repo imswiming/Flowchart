@@ -35,12 +35,12 @@
             </div>
           </div>
           <!-- Main controls row -->
-          <div style="display: flex; gap: 8px;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <div class="reset-view-btn" id="undo-btn">Undo</div>
             <div class="reset-view-btn" id="redo-btn">Redo</div>
             <div class="reset-view-btn" id="reset-view">Reset View</div>
-            <div class="reset-view-btn" id="export-btn">Export</div>
-            <div class="reset-view-btn" id="import-btn">Import</div>
+            <div class="reset-view-btn" id="export-btn">Export All</div>
+            <div class="reset-view-btn" id="import-btn">Import All</div>
             <div class="reset-view-btn" id="open-btn">Open</div>
           </div>
           <!-- Node delete button row -->
@@ -61,9 +61,9 @@
     <!-- Export popup -->
     <div id="export-popup"
       style="display:none; position:absolute; left:50%; top:80px; transform:translateX(-50%); background:white; border:1px solid #ccc; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,0.15); padding:16px 24px; z-index:3000; font-size:16px; min-width:340px;">
-      <div style="margin-bottom:8px; font-weight:bold;">Exported Flowchart</div>
+      <div style="margin-bottom:8px; font-weight:bold;">Exported Flowcharts</div>
       <textarea id="export-textarea"
-        style="width:100%; height:180px; font-size:14px; border-radius:4px; border:1px solid #aaa; resize:vertical;"
+        style="width:100%; height:300px; font-size:14px; border-radius:4px; border:1px solid #aaa; resize:vertical;"
         readonly></textarea>
       <div style="display:flex; justify-content:flex-end; margin-top:10px;">
         <button id="close-export-btn"
@@ -73,9 +73,9 @@
     <!-- Import popup -->
     <div id="import-popup"
       style="display:none; position:absolute; left:50%; top:80px; transform:translateX(-50%); background:white; border:1px solid #ccc; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,0.15); padding:16px 24px; z-index:3000; font-size:16px; min-width:340px;">
-      <div style="margin-bottom:8px; font-weight:bold;">Import Flowchart (Indented Text)</div>
+      <div style="margin-bottom:8px; font-weight:bold;">Import Flowcharts (JSON)</div>
       <textarea id="import-textarea"
-        style="width:100%; height:180px; font-size:14px; border-radius:4px; border:1px solid #aaa; resize:vertical;"></textarea>
+        style="width:100%; height:200px; font-size:14px; border-radius:4px; border:1px solid #aaa; resize:vertical;"></textarea>
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
         <button id="import-confirm-btn"
           style="font-size:15px; padding:6px 18px; border:1px solid #aaa; border-radius:5px; background:#e0ffe0; cursor:pointer;">Import</button>
@@ -86,6 +86,11 @@
     <!-- Storage popup -->
     <div id="storage-popup">
       <div style="margin-bottom:8px; font-weight:bold;">Saved Flowcharts</div>
+      <div style="margin-bottom:12px;">
+        <button id="new-flowchart-btn" style="padding:8px 16px; background:#00a67e; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">
+          + New Flowchart
+        </button>
+      </div>
       <div id="storage-slots"></div>
       <div style="display:flex; justify-content:flex-end; margin-top:10px;">
         <button id="close-storage-btn"
