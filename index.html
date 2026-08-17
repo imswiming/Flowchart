@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=overlays-content">
   <title>Flowchart Editor</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -154,13 +154,14 @@
         width: 100vw !important;
         min-width: 0 !important;
         display: block !important;
-        background: var(--panel-bg) !important;
+        background: var(--bg) !important;
         overflow: auto !important;
       }
 
       /* Other mobile styles from original CSS */
       #export-popup,
-      #import-popup {
+      #import-popup,
+      #cloud-sync-popup {
         min-width: 95vw !important;
         left: 50% !important;
         transform: translateX(-50%) !important;
@@ -181,7 +182,6 @@
         left: 50% !important;
         transform: translateX(-50%) !important;
         padding: 10px 8px !important;
-        bottom: 60px !important;
       }
 
       #node-edit-input {
@@ -310,15 +310,24 @@
         <button class="menu-item" id="hamburger-undo">↩ Undo</button>
         <button class="menu-item" id="hamburger-redo">↪ Redo</button>
         <button class="menu-item" id="hamburger-reset-view">⟲ Reset View</button>
+        <button class="menu-item" id="hamburger-orientation">↕ Top-Down</button>
+        <button class="menu-item" id="hamburger-arrangement">📐 Centered Layout</button>
         <button class="menu-item" id="hamburger-export">⬇ Export All</button>
         <button class="menu-item" id="hamburger-import">⬆ Import All</button>
+        <button class="menu-item" id="hamburger-ai-export">🤖 Export to AI</button>
+        <button class="menu-item" id="hamburger-ai-import">🤖 Import from AI</button>
         <button class="menu-item" id="hamburger-open">📂 Open</button>
+        <button class="menu-item" id="hamburger-toggle-placeholders">👻 Hide Placeholders</button>
+        <button class="menu-item" id="hamburger-cloud-sync">☁ Cloud Sync</button>
       </div>
 
       <div class="zoom-controls">
-        <div class="zoom-btn" id="zoom-in">+</div>
-        <div class="zoom-btn" id="zoom-out">-</div>
-        <div class="zoom-btn" id="reset-zoom">↻</div>
+        <div class="zoom-btn" id="top-undo-btn" title="Undo">↩</div>
+        <div class="zoom-btn" id="top-redo-btn" title="Redo">↪</div>
+        <div class="zoom-btn" id="top-open-btn" title="Open">📂</div>
+        <div class="zoom-btn" id="top-toggle-placeholders-btn" title="Show/Hide Placeholders">👻</div>
+        <div class="zoom-btn" id="top-cloud-sync-btn" title="Cloud Sync">☁</div>
+        <div class="zoom-btn" id="top-toggle-reflection-btn" title="Toggle text fields/chart view" style="display:none;">⇄</div>
       </div>
 
       <div class="reset-view-controls">
@@ -328,10 +337,17 @@
             <div class="reset-view-btn" id="undo-btn">Undo</div>
             <div class="reset-view-btn" id="redo-btn">Redo</div>
             <div class="reset-view-btn" id="reset-view">Reset View</div>
+            <div class="reset-view-btn" id="orientation-btn">↕ Top-Down</div>
+            <div class="reset-view-btn" id="arrangement-btn">📐 Centered Layout</div>
             <div class="reset-view-btn" id="export-btn">Export All</div>
             <div class="reset-view-btn" id="import-btn">Import All</div>
-            <div class="reset-view-btn" id="open-btn">Open</div>
+            <div class="reset-view-btn" id="ai-export-btn" style="background:#00a67e;color:white;">🤖 Export to AI</div>
+            <div class="reset-view-btn" id="ai-import-btn" style="background:#00a67e;color:white;">🤖 Import from AI</div>
+            <div class="reset-view-btn" id="open-btn">📂 Open</div>
+            <div class="reset-view-btn" id="toggle-placeholders-btn">👻 Hide Placeholders</div>
+            <div class="reset-view-btn" id="cloud-sync-btn">☁ Cloud Sync</div>
           </div>
+          <div id="cloud-sync-status" style="display:none; font-size:12px; color:var(--text); opacity:0.75; margin-top:2px; text-align:right;"></div>
 
           <!-- Move connection controls row -->
           <div id="connection-controls-row"
@@ -355,12 +371,23 @@
       </div>
     </div>
 
+    <!-- Reflection panel: guided questions for Assumption (pink) and Simplify (green) nodes -->
+    <div id="reflection-panel">
+      <div id="reflection-panel-header">
+        <button id="reflection-panel-back-btn" title="Back to node edit view">⇄</button>
+        <span id="reflection-panel-title">Assumption Questions</span>
+        <button id="reflection-panel-close" title="Close">&times;</button>
+      </div>
+      <div id="reflection-panel-body"></div>
+      <div id="reflection-panel-resize-handle"></div>
+    </div>
+
     <!-- Node text edit popup -->
     <div id="node-edit-popup"
-      style="display:none; position:absolute; left:50%; bottom:80px; transform:translateX(-50%); background:white; border:1px solid #ccc; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,0.15); padding:16px 24px; z-index:3000; font-size:16px; min-width:260px;">
+      style="display:none; position:absolute; left:50%; bottom:80px; transform:translateX(-50%); background:white; border:1px solid #ccc; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,0.15); padding:16px 24px; z-index:3000; font-size:16px; min-width:260px; max-width:min(520px, 90vw); box-sizing:border-box;">
       <form id="node-edit-form" style="display:flex; gap:10px; align-items:center;">
-        <input id="node-edit-input" type="text"
-          style="flex:1; font-size:16px; padding:4px 8px; border-radius:4px; border:1px solid #aaa;">
+        <textarea id="node-edit-input" rows="1" wrap="soft"
+          style="flex:1; width:100%; font-size:16px; padding:4px 8px; border-radius:4px; border:1px solid #aaa; font-family:Arial, sans-serif; resize:none; overflow:hidden; white-space:pre-wrap; word-wrap:break-word; line-height:1.3; min-height:26px; max-height:40vh; box-sizing:border-box;"></textarea>
       </form>
     </div>
 
@@ -405,9 +432,87 @@
           style="font-size:15px; padding:6px 18px; border:1px solid #aaa; border-radius:5px; background:#f8f8f8; cursor:pointer;">Close</button>
       </div>
     </div>
+
+    <!-- Cloud Sync popup -->
+    <div id="cloud-sync-popup"
+      style="display:none; position:absolute; left:50%; top:80px; transform:translateX(-50%); background:white; border:1px solid #ccc; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,0.15); padding:16px 24px; z-index:3000; font-size:14px; min-width:320px; max-width:min(420px, 92vw);">
+      <div style="margin-bottom:10px; font-weight:bold;">Cloud Sync (GitHub Gist)</div>
+      <div style="margin-bottom:10px; line-height:1.4;">
+        Free, no size cap you'll ever hit. On <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener">github.com/settings/tokens/new</a>
+        (this is the <b>classic</b> token page - gist access isn't available on fine-grained tokens yet), check the
+        <b>gist</b> checkbox, generate, then paste the token below and click "Create New Gist" once. Enter the same
+        token and Gist ID on your other devices to sync between them.
+      </div>
+      <label style="display:block; margin-bottom:4px; font-weight:bold;">Personal Access Token</label>
+      <input id="cloud-sync-key-input" type="text" placeholder="ghp_... or github_pat_..."
+        style="width:100%; box-sizing:border-box; padding:6px 8px; font-size:14px; border-radius:4px; border:1px solid #aaa; margin-bottom:10px;">
+      <label style="display:block; margin-bottom:4px; font-weight:bold;">Gist ID</label>
+      <div style="display:flex; gap:6px; margin-bottom:10px;">
+        <input id="cloud-sync-bin-input" type="text" placeholder="Leave blank, then Create New Gist"
+          style="flex:1; box-sizing:border-box; padding:6px 8px; font-size:14px; border-radius:4px; border:1px solid #aaa;">
+        <button id="cloud-sync-create-bin-btn"
+          style="font-size:13px; padding:6px 10px; border:1px solid #aaa; border-radius:5px; background:#e0ffe0; cursor:pointer; white-space:nowrap;">Create New Gist</button>
+      </div>
+      <div id="cloud-sync-popup-status" style="min-height:18px; margin-bottom:8px; font-size:13px;"></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+        <button id="cloud-sync-disconnect-btn"
+          style="font-size:13px; padding:6px 12px; border:1px solid #ffaaaa; border-radius:5px; background:#ffe0e0; color:#a00; cursor:pointer;">Disconnect</button>
+        <div style="display:flex; gap:8px;">
+          <button id="cloud-sync-save-btn"
+            style="font-size:14px; padding:6px 16px; border:1px solid #aaa; border-radius:5px; background:#e0ffe0; cursor:pointer;">Save & Sync Now</button>
+          <button id="close-cloud-sync-btn"
+            style="font-size:14px; padding:6px 16px; border:1px solid #aaa; border-radius:5px; background:#f8f8f8; cursor:pointer;">Close</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
+    // ===== KEYBOARD OVERLAY (don't let the on-screen keyboard push the chart up) =====
+    // Two things normally make the keyboard "push" mobile content up:
+    //  1. CSS vh units and window.innerHeight can track the shrunk visual viewport in
+    //     some browsers once the keyboard opens.
+    //  2. The browser scrolls the page to bring the focused input into view.
+    // interactive-widget=overlays-content (see the viewport meta tag) fixes both for
+    // browsers that support it. This is the fallback for the rest (notably iOS Safari):
+    // pin --app-height to the pre-keyboard layout height, and cancel any scroll the
+    // visual viewport reports once the keyboard is open.
+    (function() {
+      let lastWidth = window.innerWidth;
+      const setAppHeight = () => {
+        document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
+      };
+      setAppHeight();
+
+      window.addEventListener('resize', () => {
+        const widthChanged = window.innerWidth !== lastWidth;
+        lastWidth = window.innerWidth;
+        // The keyboard opening changes height without changing width; a real window
+        // resize or orientation change changes width too (or there's no visualViewport
+        // available to otherwise tell the two apart).
+        if (widthChanged || !window.visualViewport) {
+          setAppHeight();
+        }
+      });
+      window.addEventListener('orientationchange', () => {
+        setTimeout(() => {
+          lastWidth = window.innerWidth;
+          setAppHeight();
+        }, 100);
+      });
+
+      if (window.visualViewport) {
+        const vv = window.visualViewport;
+        const resetScroll = () => {
+          if (window.scrollX !== 0 || window.scrollY !== 0) {
+            window.scrollTo(0, 0);
+          }
+        };
+        vv.addEventListener('resize', resetScroll);
+        vv.addEventListener('scroll', resetScroll);
+      }
+    })();
+
     // Hamburger menu toggle
     document.addEventListener('DOMContentLoaded', function() {
       const hamburgerBtn = document.getElementById('hamburger-menu');
@@ -435,7 +540,10 @@
         'hamburger-reset-view': 'reset-view',
         'hamburger-export': 'export-btn',
         'hamburger-import': 'import-btn',
-        'hamburger-open': 'open-btn'
+        'hamburger-ai-export': 'ai-export-btn',
+        'hamburger-ai-import': 'ai-import-btn',
+        'hamburger-open': 'open-btn',
+        'hamburger-cloud-sync': 'cloud-sync-btn'
       };
 
       // For each hamburger item, find the original button and trigger click
@@ -481,137 +589,6 @@
         setTimeout(updateHamburgerStates, 100);
       }
 
-      // ===== KEYBOARD AUTO-LAUNCH ON NODE SELECT =====
-      // Override the showNodeEditPopup method to force keyboard on mobile
-      const originalShowNodeEditPopup = window.FlowchartViewer && 
-        window.FlowchartViewer.prototype && 
-        window.FlowchartViewer.prototype.showNodeEditPopup;
-
-      if (originalShowNodeEditPopup) {
-        // The method is defined in script.js, we'll patch it via a custom wrapper
-        // Since we can't easily override the prototype method directly, we'll use
-        // a MutationObserver to detect when the input gets focus and then force the keyboard
-        const nodeEditInput = document.getElementById('node-edit-input');
-        if (nodeEditInput) {
-          // Force focus and keyboard on any click or touch on the flowchart
-          const flowchart = document.getElementById('flowchart');
-          
-          // Detect node clicks by watching for the node-edit-popup becoming visible
-          const popupObserver = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-              if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-                const popup = mutation.target;
-                if (popup.style.display === 'block') {
-                  // Popup is now visible - focus the input and force keyboard
-                  const input = document.getElementById('node-edit-input');
-                  if (input) {
-                    // Small delay to ensure popup is fully rendered
-                    setTimeout(() => {
-                      input.focus();
-                      input.click(); // Some mobile browsers need click to trigger keyboard
-                      // For iOS, we also need to call focus again after a tiny delay
-                      setTimeout(() => {
-                        input.focus();
-                        input.click();
-                      }, 100);
-                    }, 50);
-                  }
-                }
-              }
-            });
-          });
-
-          const popup = document.getElementById('node-edit-popup');
-          if (popup) {
-            popupObserver.observe(popup, { attributes: true, attributeFilter: ['style'] });
-          }
-
-          // Also intercept clicks on the input itself to ensure keyboard
-          nodeEditInput.addEventListener('click', function(e) {
-            this.focus();
-            this.click(); // Force keyboard
-          });
-
-          nodeEditInput.addEventListener('touchstart', function(e) {
-            this.focus();
-            // On some devices, touchstart doesn't trigger keyboard reliably
-            setTimeout(() => {
-              this.focus();
-              this.click();
-            }, 50);
-          });
-        }
-
-        // Also patch the showNodeEditPopup in the instance after it's created
-        // We'll use a global variable to store the instance
-        const origInit = window.FlowchartViewer;
-        if (origInit) {
-          // Wait for the instance to be created
-          const checkInstance = setInterval(() => {
-            // Find the FlowchartViewer instance
-            const viewer = document.querySelector('.flowchart-panel')?.__viewer;
-            if (viewer && viewer.showNodeEditPopup) {
-              clearInterval(checkInstance);
-              // Store reference to original method
-              const original = viewer.showNodeEditPopup.bind(viewer);
-              viewer.showNodeEditPopup = function(d) {
-                original(d);
-                // Focus input after popup is shown
-                setTimeout(() => {
-                  const input = document.getElementById('node-edit-input');
-                  if (input) {
-                    input.focus();
-                    input.click();
-                    setTimeout(() => {
-                      input.focus();
-                      input.click();
-                    }, 100);
-                  }
-                }, 50);
-              };
-            }
-          }, 100);
-        }
-      }
-
-      // Alternative approach: monitor clicks on the flowchart for node selection
-      document.addEventListener('click', function(e) {
-        const nodeElement = e.target.closest('.node');
-        if (nodeElement) {
-          // A node was clicked - wait for popup to appear and then focus input
-          setTimeout(() => {
-            const input = document.getElementById('node-edit-input');
-            const popup = document.getElementById('node-edit-popup');
-            if (input && popup && popup.style.display === 'block') {
-              input.focus();
-              input.click();
-              setTimeout(() => {
-                input.focus();
-                input.click();
-              }, 100);
-            }
-          }, 200);
-        }
-      });
-
-      // Handle touch events on nodes
-      document.addEventListener('touchstart', function(e) {
-        const nodeElement = e.target.closest('.node');
-        if (nodeElement) {
-          setTimeout(() => {
-            const input = document.getElementById('node-edit-input');
-            const popup = document.getElementById('node-edit-popup');
-            if (input && popup && popup.style.display === 'block') {
-              input.focus();
-              input.click();
-              setTimeout(() => {
-                input.focus();
-                input.click();
-              }, 150);
-            }
-          }, 300);
-        }
-      });
     });
   </script>
 </body>
