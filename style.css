@@ -1,6 +1,7 @@
 html,
 body {
     height: 100%;
+    height: var(--app-height, 100%);
     margin: 0;
     padding: 0;
 }
@@ -24,6 +25,7 @@ body {
     margin: 0;
     padding: 0;
     height: 100vh;
+    height: var(--app-height, 100vh);
     width: 100vw;
     overflow: hidden;
     background: var(--bg);
@@ -32,11 +34,130 @@ body {
 
 .container {
     height: 100vh;
+    height: var(--app-height, 100vh);
     width: 100vw;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     position: relative;
+}
+
+/* Reflection panel: guided questions for Assumption (pink) / Simplify (green) nodes */
+#reflection-panel {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 340px;
+    min-width: 220px;
+    max-width: 80vw;
+    background: var(--popup-bg);
+    border-right: 1px solid var(--border);
+    box-shadow: 2px 0 16px rgba(0, 0, 0, 0.45);
+    z-index: 2500;
+    flex-direction: column;
+}
+
+#reflection-panel-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    font-weight: bold;
+    flex-shrink: 0;
+    color: var(--text);
+}
+
+#reflection-panel-title {
+    flex: 1;
+    text-align: center;
+}
+
+#reflection-panel-close,
+#reflection-panel-back-btn {
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 6px;
+    flex-shrink: 0;
+}
+
+/* Desktop shows the panel beside the node edit popup at all times, so there's nothing
+   to "go back" to - this button is mobile-only (see media query below). */
+#reflection-panel-back-btn {
+    display: none;
+}
+
+#reflection-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.reflection-question {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.4;
+    margin-bottom: 6px;
+}
+
+.reflection-answer {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--control-bg);
+    color: var(--text);
+    resize: none;
+    overflow: hidden;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    min-height: 36px;
+    line-height: 1.4;
+}
+
+#reflection-panel-resize-handle {
+    position: absolute;
+    top: 0;
+    right: -3px;
+    width: 6px;
+    height: 100%;
+    cursor: ew-resize;
+    z-index: 2501;
+}
+
+#reflection-panel-resize-handle:hover {
+    background: rgba(0, 166, 126, 0.3);
+}
+
+/* Mobile: the reflection panel becomes a full-screen overlay (there's no room for a
+   sidebar) when the toggle button switches to it. */
+@media (max-width: 600px) {
+    #reflection-panel {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    #reflection-panel-resize-handle {
+        display: none;
+    }
+
+    #reflection-panel-back-btn {
+        display: inline-block;
+    }
 }
 
 .flowchart-panel {
@@ -96,6 +217,14 @@ body {
     cursor: pointer;
 }
 
+.radial-add-btn rect {
+    transition: fill 0.15s ease;
+}
+
+.radial-add-btn:hover rect {
+    fill: #26313f;
+}
+
 .node rect {
     stroke: #999;
     stroke-width: 1.5px;
@@ -117,7 +246,7 @@ body {
     position: absolute;
     top: 20px;
     right: 20px;
-    z-index: 100;
+    z-index: 2600;
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -185,6 +314,7 @@ body {
 #node-edit-popup,
 #export-popup,
 #import-popup,
+#ai-import-popup,
 #storage-popup,
 #move-instruction,
 #connection-instruction {
@@ -197,6 +327,7 @@ body {
 /* Buttons inside popups (exclude node color buttons so their inline colors show) */
 #export-popup button,
 #import-popup button,
+#ai-import-popup button,
 #storage-popup button {
     background: var(--control-bg) !important;
     color: var(--text) !important;
@@ -214,7 +345,8 @@ body {
 
 /* Export/Import popup button containers */
 #export-popup div:last-child,
-#import-popup div:last-child {
+#import-popup div:last-child,
+#ai-import-popup div:last-child {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
@@ -222,7 +354,8 @@ body {
 }
 
 #export-popup button,
-#import-popup button {
+#import-popup button,
+#ai-import-popup button {
     white-space: nowrap;
     flex-shrink: 0;
 }
@@ -365,7 +498,9 @@ body {
         position: fixed !important;
         inset: 0 !important;
         height: 100vh !important;
+        height: var(--app-height, 100vh) !important;
         min-height: 100vh !important;
+        min-height: var(--app-height, 100vh) !important;
         width: 100vw !important;
         min-width: 0 !important;
         overflow: auto !important;
@@ -376,11 +511,12 @@ body {
         position: fixed !important;
         inset: 0 !important;
         height: 100vh !important;
+        height: var(--app-height, 100vh) !important;
         min-height: 400px !important;
         width: 100vw !important;
         min-width: 0 !important;
         display: block !important;
-        background: var(--panel-bg) !important;
+        background: var(--bg) !important;
         overflow: auto !important;
     }
 
@@ -434,7 +570,8 @@ body {
     }
 
     #export-popup,
-    #import-popup {
+    #import-popup,
+    #ai-import-popup {
         min-width: 95vw !important;
         left: 50% !important;
         transform: translateX(-50%) !important;
@@ -442,7 +579,8 @@ body {
     }
 
     #export-textarea,
-    #import-textarea {
+    #import-textarea,
+    #ai-import-textarea {
         font-size: 13px !important;
         width: 100% !important;
         min-width: 0 !important;
@@ -545,7 +683,8 @@ body {
     }
 
     #export-popup div:last-child button,
-    #import-popup div:last-child button {
+    #import-popup div:last-child button,
+    #ai-import-popup div:last-child button {
         font-size: 14px !important;
         padding: 6px 12px !important;
     }
